@@ -1,0 +1,93 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Executivo - FOA</title>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  
+  <!-- XLSX -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <!-- Materialize CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  
+  <!-- Google Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style/style.css">
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <h5>Carregando Dashboard...</h5>
+      <p>Processando dados do Excel</p>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="dashboard-header">
+    <div class="container">
+      <h1 class="dashboard-title">
+        <i class="material-icons large" style="vertical-align: middle; margin-right: 0.5rem;">dashboard</i>
+        Dashboard Executivo Assessoria Jurídica
+      </h1>
+      <p class="dashboard-subtitle">Fundação Oswaldo Aranha - Análise de Processos e Tarefas</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Stats Overview -->
+    <div class="stats-overview">
+      <div class="stat-card fade-in">
+        <i class="material-icons stat-icon blue">assignment</i>
+        <h3 class="stat-number" id="totalProcessos">-</h3>
+        <p class="stat-label">Total de Processos</p>
+      </div>
+            
+      <div class="stat-card fade-in" onclick="rolarPara('audiencias')" style="cursor: pointer;">
+        <i class="material-icons stat-icon green">event_available</i>
+        <h3 class="stat-number" id="totalAudiencias">-</h3>
+        <p class="stat-label">Audiências Agendadas</p>
+      </div>
+      
+      <div class="stat-card fade-in">
+        <i class="material-icons stat-icon orange">pending_actions</i>
+        <h3 class="stat-number" id="totalPendentes">-</h3>
+        <p class="stat-label">Tarefas Pendentes</p>
+      </div>
+      
+      <div class="stat-card fade-in" onclick="rolarPara('prazos-atrasados')" style="cursor: pointer;">
+        <i class="material-icons stat-icon red">warning</i>
+        <h3 class="stat-number" id="totalAtrasados">-</h3>
+        <p class="stat-label">Prazos Atrasados</p>
+      </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-grid">
+      <div id="graficos"></div>
+    </div>
+  </div>
+
+  <!-- Materialize JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  
+  <!-- URL Configuration -->
+  <script src="js/url.js"></script>
+  
+  <!-- Main Script -->
+  <script src="js/script.js"></script>
+  
+ 
+</body>
+</html>
