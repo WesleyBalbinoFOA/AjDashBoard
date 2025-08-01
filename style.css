@@ -1,10 +1,22 @@
 :root {
+  /* Paleta original */
   --primary-color: #1976d2;
   --secondary-color: #424242;
   --success-color: #4caf50;
   --warning-color: #ff9800;
   --error-color: #f44336;
+
+  /* Paleta de alto contraste */
+  --primary-color-contrast: #1565c0;       /* Azul escuro para ícones principais */
+  --secondary-color-contrast: #263238;     /* Cinza grafite para texto e números */
+  --success-color-contrast: #2e7d32;       /* Verde escuro acessível */
+  --warning-color-contrast: #ef6c00;       /* Laranja escuro e vibrante */
+  --error-color-contrast: #c62828;         /* Vermelho escuro para alertas */
+  --info-color: #00838f;                   /* Azul petróleo para neutros ou informativos */
+
+  /* Estética visual */
   --gradient-bg: linear-gradient(135deg, #abb9f8 0%, #4b82a2 100%);
+  --card-bg: rgba(255, 255, 255, 0.95);
   --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
@@ -153,19 +165,19 @@ body {
 }
 
 .stat-icon.blue {
-  color: var(--primary-color);
+  color: var(--primary-color-contrast);
 }
 
 .stat-icon.green {
-  color: var(--success-color);
+  color: var(--success-color-contrast);
 }
 
 .stat-icon.orange {
-  color: var(--warning-color);
+  color: var(--warning-color-contrast);
 }
 
 .stat-icon.red {
-  color: var(--error-color);
+  color: var(--error-color-contrast);
 }
 
 .stat-number {
