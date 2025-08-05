@@ -8,27 +8,92 @@ const CORES = {
 
 // 📦 Importa a URL do arquivo url.js
 const excelUrl = "https://fundacaooswaldoaranha-my.sharepoint.com/personal/wesley_balbino_foa_org_br/_layouts/15/download.aspx?share=EdsT2JkTPstFhYTAoyB0kWwB0T83o-R9AR4Wu2Yex8hxBw";
-
+// 🗂️ Variável global para armazenar os dados do Excel
 let dadosExcel = [];
+// 📊 Armazena instâncias de gráficos
+const charts = {}; 
 
-const charts = {}; // Armazena instâncias de gráficos
+// Função para obter metadados do Excel (espera um blob)
+async function obterMetadadosExcel(blob) {
+    const zip = await JSZip.loadAsync(blob);
+    const coreXml = await zip.file("docProps/core.xml").async("string");
 
-// 🆕 Função para verificar se deve atualizar os dados baseado no horário
-function deveAtualizarDados() {
-    const agora = new Date();
-    const horas = agora.getHours();
-    const minutos = agora.getMinutes();
-    const horaAtual = horas + (minutos / 60);
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(coreXml, "text/xml");
 
-    // Converte 08:15 e 16:15 para formato decimal
-    const horarioManha = 8 + (15 / 60); // 8.25
-    const horarioTarde = 16 + (15 / 60); // 16.25
+    const ns = {
+        dcterms: "http://purl.org/dc/terms/",
+    };
 
-    // Verifica se passou dos horários de atualização
-    return horaAtual >= horarioManha || horaAtual >= horarioTarde;
+    function getText(tag) {
+        const el = xmlDoc.getElementsByTagNameNS(ns.dcterms, tag)[0];
+        return el ? el.textContent : null;
+    }
+
+    return {
+        criadoEm: getText("created"),
+        modificadoEm: getText("modified")
+    };
 }
 
-// 🆕 Função para verificar se os dados foram atualizados hoje nos horários corretos
+// 🔁 Função principal: baixa o Excel, extrai metadados e lê os dados
+async function carregarExcelComMetadados() {
+    try {
+        // console.log("📥 Carregando dados do Excel...");
+
+        const response = await fetch(excelUrl);
+
+        // ⚠️ Clonar resposta para usar dois blobs distintos
+        const blobMetadados = await response.clone().blob();
+        const blobPlanilha = await response.blob();
+
+        // 🔍 Extrair metadados
+        const meta = await obterMetadadosExcel(blobMetadados);
+
+        console.group("📊 Metadados do Arquivo Excel");
+        // console.log("🔗 URL:", excelUrl);
+        // console.log("📅 Criado em (UTC):", meta.criadoEm);
+        // console.log("🕓 Modificado em (UTC):", meta.modificadoEm);
+
+        if (meta.modificadoEm) {
+            const dataModificacao = new Date(meta.modificadoEm);
+            const localTime = dataModificacao.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+            // console.log("🇧🇷 Modificado em (Horário de Brasília):", localTime);
+
+            localStorage.setItem("ultimaAtualizacaoExcel", dataModificacao.toISOString());
+            // console.log("💾 Data de modificação salva no localStorage como 'ultimaAtualizacaoExcel'");
+        } else {
+            console.warn("⚠️ Metadado de modificação não encontrado.");
+        }
+        console.groupEnd();
+
+        // 📄 Ler dados da planilha usando SheetJS (xlsx.js)
+        const arrayBuffer = await blobPlanilha.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+
+        // Exemplo: pegar dados da primeira aba
+        const primeiraAba = workbook.SheetNames[0];
+        const dados = XLSX.utils.sheet_to_json(workbook.Sheets[primeiraAba]);
+
+        dadosExcel = dados; // Salvar para uso futuro
+
+        // console.log(`📄 Dados brutos carregados: ${dados.length} registros`);
+        // Você pode agora processar ou exibir `dados`
+
+    } catch (error) {
+        console.error("❌ Erro ao carregar o Excel ou seus metadados:", error);
+    }
+}
+
+// ⏱️ Verifica se já passou do horário limite (08:15)
+function deveAtualizarDados() {
+    const agora = new Date();
+    const horaAtual = agora.getHours() + agora.getMinutes() / 60;
+    const horarioManha = 8 + 15 / 60;  // 8:15
+    return horaAtual >= horarioManha;
+}
+
+// 📆 Verifica se os dados foram atualizados hoje e após o horário limite
 function dadosAtualizadosHoje() {
     const ultimaAtualizacao = localStorage.getItem("ultimaAtualizacaoExcel");
     if (!ultimaAtualizacao) return false;
@@ -36,21 +101,54 @@ function dadosAtualizadosHoje() {
     const dataUltimaAtualizacao = new Date(ultimaAtualizacao);
     const hoje = new Date();
 
-    // Verifica se foi atualizado hoje
-    const mesmodia = dataUltimaAtualizacao.toDateString() === hoje.toDateString();
+    if (dataUltimaAtualizacao.toDateString() !== hoje.toDateString()) return false;
 
-    if (!mesmodia) return false;
-
-    const horasUltimaAtualizacao = dataUltimaAtualizacao.getHours();
-    const minutosUltimaAtualizacao = dataUltimaAtualizacao.getMinutes();
-    const horaUltimaAtualizacao = horasUltimaAtualizacao + (minutosUltimaAtualizacao / 60);
-
-    // Verifica se a última atualização foi após um dos horários de corte
-    const horarioManha = 8 + (15 / 60);
-    const horarioTarde = 16 + (15 / 60);
-
-    return horaUltimaAtualizacao >= horarioManha || horaUltimaAtualizacao >= horarioTarde;
+    const horaAtualizacao = dataUltimaAtualizacao.getHours() + dataUltimaAtualizacao.getMinutes() / 60;
+    const horarioManha = 8 + 15 / 60;
+    return horaAtualizacao >= horarioManha;
 }
+
+// 🆕 Atualiza e exibe os metadados do Excel no console + salva no localStorage
+async function atualizarMetadadosDoExcel() {
+    try {
+        const response = await fetch(excelUrl);
+        const blob = await response.blob();
+        const meta = await obterMetadadosExcel(blob);
+
+        console.group("📊 Metadados do Arquivo Excel");
+        // console.log("🔗 URL:", excelUrl);
+        // console.log("📅 Criado em (UTC):", meta.criadoEm);
+        // console.log("🕓 Modificado em (UTC):", meta.modificadoEm);
+
+        if (meta.modificadoEm) {
+            const dataModificacao = new Date(meta.modificadoEm);
+            const localTime = dataModificacao.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+            // console.log("🇧🇷 Modificado em (Horário de Brasília):", localTime);
+
+            localStorage.setItem("ultimaAtualizacaoExcel", dataModificacao.toISOString());
+            // console.log("💾 Data de modificação salva no localStorage como 'ultimaAtualizacaoExcel'");
+        } else {
+            console.warn("⚠️ Metadado de modificação não encontrado.");
+        }
+
+        console.groupEnd();
+    } catch (error) {
+        console.error("❌ Erro ao obter metadados do Excel:", error);
+    }
+}
+
+// 📌 Inicia a leitura dos metadados e dados ao carregar a página
+(async () => {
+    // Só carrega os dados se ainda não tiver atualizado hoje após 08:15
+    if (!dadosAtualizadosHoje() && deveAtualizarDados()) {
+        await carregarExcelComMetadados();
+    } else {
+        // console.log("🟢 Dados já atualizados hoje após o horário limite.");
+        await atualizarMetadadosDoExcel();
+    }
+})();
+
+
 
 function exibirUltimaAtualizacao() {
     const el = document.getElementById("infoAtualizacao");
@@ -183,11 +281,11 @@ async function carregarExcel() {
     const dadosSalvos = localStorage.getItem("dadosExcel");
     if (dadosSalvos && !forcarAtualizacao) {
         dadosExcel = JSON.parse(dadosSalvos);
-        console.log(`✅ Dados carregados do localStorage: ${dadosExcel.length} registros`);
+        // console.log(`✅ Dados carregados do localStorage: ${dadosExcel.length} registros`);
         return dadosExcel;
     }
 
-    console.log("🔄 Carregando dados do Excel...");
+    // console.log("🔄 Carregando dados do Excel...");
 
     try {
         const response = await fetch(excelUrl);
@@ -201,7 +299,7 @@ async function carregarExcel() {
             defval: ""
         });
 
-        console.log(`📊 Dados brutos carregados: ${dadosBrutos.length} registros`);
+        // console.log(`📊 Dados brutos carregados: ${dadosBrutos.length} registros`);
 
         // 🆕 Converte todas as datas para formato pt-BR antes de salvar
         dadosExcel = dadosBrutos.map((registro, index) => {
@@ -227,7 +325,7 @@ async function carregarExcel() {
 
                     // Log das primeiras 5 conversões para debug
                     if (index < 5 && valorOriginal !== valorConvertido) {
-                        console.log(`🔄 [${index + 1}] ${campo}: "${valorOriginal}" -> "${valorConvertido}"`);
+                        // console.log(`🔄 [${index + 1}] ${campo}: "${valorOriginal}" -> "${valorConvertido}"`);
                     }
                 }
             });
@@ -239,14 +337,14 @@ async function carregarExcel() {
         localStorage.setItem("dadosExcel", JSON.stringify(dadosExcel));
         localStorage.setItem("ultimaAtualizacaoExcel", new Date().toISOString());
 
-        console.log("✅ Dados atualizados e convertidos com sucesso!");
-        console.log(`📊 Total de registros processados: ${dadosExcel.length}`);
+        // console.log("✅ Dados atualizados e convertidos com sucesso!");
+        // console.log(`📊 Total de registros processados: ${dadosExcel.length}`);
 
         // Debug das primeiras datas convertidas
-        console.log("🔍 Primeiras 5 datas convertidas:");
+        // console.log("🔍 Primeiras 5 datas convertidas:");
         dadosExcel.slice(0, 5).forEach((item, i) => {
             const data = item["Data do agendamento"];
-            console.log(`  ${i + 1}. "${data}"`);
+            // console.log(`  ${i + 1}. "${data}"`);
         });
 
     } catch (error) {
@@ -262,7 +360,7 @@ function filtrarDadosAteHoje(dados) {
     const hoje = new Date();
     hoje.setHours(23, 59, 59, 999); // Final do dia
 
-    console.log(`🔍 Filtrando dados até: ${hoje.toLocaleDateString('pt-BR')}`);
+    // console.log(`🔍 Filtrando dados até: ${hoje.toLocaleDateString('pt-BR')}`);
 
     const dadosFiltrados = dados.filter(item => {
         const dataStr = item["Data do agendamento"];
@@ -312,13 +410,13 @@ function filtrarDadosAteHoje(dados) {
         return dataValida;
     });
 
-    console.log(`📊 Total de registros originais: ${dados.length}`);
-    console.log(`📊 Registros filtrados até hoje: ${dadosFiltrados.length}`);
+    // console.log(`📊 Total de registros originais: ${dados.length}`);
+    // console.log(`📊 Registros filtrados até hoje: ${dadosFiltrados.length}`);
 
     // Debug: mostra as 5 primeiras datas filtradas
-    console.log('✅ Primeiras 5 datas que passaram no filtro:');
+    // console.log('✅ Primeiras 5 datas que passaram no filtro:');
     dadosFiltrados.slice(0, 5).forEach((item, i) => {
-        console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
+        // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
     });
 
     // Debug: mostra 5 datas que foram rejeitadas (futuras)
@@ -341,9 +439,9 @@ function filtrarDadosAteHoje(dados) {
     });
 
     if (rejeitados.length > 0) {
-        console.log('❌ Primeiras 5 datas futuras rejeitadas:');
+        // console.log('❌ Primeiras 5 datas futuras rejeitadas:');
         rejeitados.slice(0, 5).forEach((item, i) => {
-            console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
+            // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
         });
     }
 
@@ -354,8 +452,8 @@ function gerarGraficoPorColuna(coluna, dados, canvasId, cor = CORES.roxo, filtra
     let dadosFiltrados = dados;
     if (filtrarAteHoje) {
         dadosFiltrados = filtrarDadosAteHoje(dados);
-        console.log(`🎯 Gráfico "${coluna}" - Total original: ${dados.length}`);
-        console.log(`🎯 Gráfico "${coluna}" - Filtrado até hoje: ${dadosFiltrados.length} registros`);
+        // console.log(`🎯 Gráfico "${coluna}" - Total original: ${dados.length}`);
+        // console.log(`🎯 Gráfico "${coluna}" - Filtrado até hoje: ${dadosFiltrados.length} registros`);
     }
 
     const contagem = {};
@@ -415,12 +513,12 @@ function gerarGraficoPorColuna(coluna, dados, canvasId, cor = CORES.roxo, filtra
                     });
                 }
 
-                console.log(`🔍 Clique no gráfico "${coluna}": ${valorClicado} - ${resultados.length} resultados`);
+                // console.log(`🔍 Clique no gráfico "${coluna}": ${valorClicado} - ${resultados.length} resultados`);
 
                 // Debug: mostra algumas datas dos resultados
-                console.log('📅 Primeiras 5 datas dos resultados:');
+                // console.log('📅 Primeiras 5 datas dos resultados:');
                 resultados.slice(0, 5).forEach((item, i) => {
-                    console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
+                    // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
                 });
 
                 exibirTabela(canvasId, resultados);
@@ -539,7 +637,7 @@ function gerarGraficoEvolucaoMensal(dados, canvasId) {
 
 // 🧹 Função para limpar o cache e forçar recarregamento dos dados
 function limparCacheERecarregar() {
-    console.log("🧹 Limpando cache e recarregando dados...");
+    // console.log("🧹 Limpando cache e recarregando dados...");
 
     // Remove dados do localStorage
     localStorage.removeItem("dadosExcel");
@@ -548,7 +646,7 @@ function limparCacheERecarregar() {
     // Limpa variável global
     dadosExcel = [];
 
-    console.log("✅ Cache limpo! Recarregue a página para baixar dados atualizados.");
+    // console.log("✅ Cache limpo! Recarregue a página para baixar dados atualizados.");
 
     // Opcionalmente, pode recarregar a página automaticamente:
     // window.location.reload();
@@ -893,9 +991,9 @@ function gerarTabelaPrazosFatais(dados) {
     const seteDiasDepois = new Date(hoje);
     seteDiasDepois.setDate(hoje.getDate() + 7); // 7 dias a partir de hoje
 
-    console.log(`🚨 Analisando prazos fatais:`);
-    console.log(`   📅 Hoje: ${hoje.toLocaleDateString('pt-BR')}`);
-    console.log(`   📅 Limite (7 dias): ${seteDiasDepois.toLocaleDateString('pt-BR')}`);
+    // console.log(`🚨 Analisando prazos fatais:`);
+    // console.log(`   📅 Hoje: ${hoje.toLocaleDateString('pt-BR')}`);
+    // console.log(`   📅 Limite (7 dias): ${seteDiasDepois.toLocaleDateString('pt-BR')}`);
 
     // Função auxiliar para verificar se um campo indica "Sim" para prazo fatal
     const temPrazoFatal = (valor) => {
@@ -1018,9 +1116,9 @@ function gerarTabelaPrazosFatais(dados) {
         return getDataVencimento(a) - getDataVencimento(b);
     });
 
-    console.log(`🚨 Prazos fatais encontrados: ${prazosFatais.length}`);
-    console.log(`   ❌ Atrasados: ${atrasados.length}`);
-    console.log(`   ⚠️ Vencem em 7 dias: ${proximosVencimento.length}`);
+    // console.log(`🚨 Prazos fatais encontrados: ${prazosFatais.length}`);
+    // console.log(`   ❌ Atrasados: ${atrasados.length}`);
+    // console.log(`   ⚠️ Vencem em 7 dias: ${proximosVencimento.length}`);
 
     // Função para obter a classe CSS baseada no status do prazo
     const getClassePrazo = (item) => {
@@ -1218,7 +1316,7 @@ async function adicionarGraficoRadarResponsaveis() {
 
 // 🆕 Função corrigida para gerar gráfico de pendências com filtro correto
 function gerarGraficoPendenciasStacked(dados, canvasId) {
-    console.log(`🎯 Gráfico Pendências - Iniciando filtro`);
+    // console.log(`🎯 Gráfico Pendências - Iniciando filtro`);
 
     const responsaveis = new Set();
     const areas = new Set();
@@ -1241,9 +1339,9 @@ function gerarGraficoPendenciasStacked(dados, canvasId) {
         return statusPendente;
     });
 
-    console.log(`📊 Pendências - Total original: ${dados.length}`);
-    console.log(`📊 Pendências - Filtrado por data: ${dadosFiltradosPorData.length}`);
-    console.log(`📊 Pendências - Final (data + status): ${dadosFiltrados.length}`);
+    // console.log(`📊 Pendências - Total original: ${dados.length}`);
+    // console.log(`📊 Pendências - Filtrado por data: ${dadosFiltradosPorData.length}`);
+    // console.log(`📊 Pendências - Final (data + status): ${dadosFiltrados.length}`);
 
     dadosFiltrados.forEach(item => {
         const responsavel = item["Responsável"]?.trim();
@@ -1375,16 +1473,16 @@ function obterCorStatus(status) {
 
 // 🔍 Função de debug para verificar como as datas estão sendo processadas
 function debugDatas(dados) {
-    console.log("🔍 === DEBUG DE DATAS ===");
+    // console.log("🔍 === DEBUG DE DATAS ===");
 
     const hoje = new Date();
     hoje.setHours(23, 59, 59, 999);
-    console.log(`📅 Data de referência (hoje): ${hoje.toLocaleDateString('pt-BR')}`);
+    // console.log(`📅 Data de referência (hoje): ${hoje.toLocaleDateString('pt-BR')}`);
 
     // Analisa os primeiros 20 registros
     const amostra = dados.slice(0, 20);
 
-    console.log("\n📊 Análise das primeiras 20 datas:");
+    // console.log("\n📊 Análise das primeiras 20 datas:");
     amostra.forEach((item, i) => {
         const dataStr = item["Data do agendamento"];
         let status = "❌ Inválida";
@@ -1413,7 +1511,7 @@ function debugDatas(dados) {
             }
         }
 
-        console.log(`${i + 1}. "${dataStr}" -> ${status} ${dataParsed ? `(${dataParsed.toLocaleDateString('pt-BR')})` : ''}`);
+        // console.log(`${i + 1}. "${dataStr}" -> ${status} ${dataParsed ? `(${dataParsed.toLocaleDateString('pt-BR')})` : ''}`);
     });
 
     // Conta quantas são futuras vs passadas
@@ -1437,12 +1535,12 @@ function debugDatas(dados) {
         return false;
     });
 
-    console.log(`\n📈 Resumo:`);
-    console.log(`   Total de registros: ${dados.length}`);
-    console.log(`   Registros com datas futuras: ${futuras.length}`);
-    console.log(`   Registros que devem passar no filtro: ${dados.length - futuras.length}`);
+    // console.log(`\n📈 Resumo:`);
+    // console.log(`   Total de registros: ${dados.length}`);
+    // console.log(`   Registros com datas futuras: ${futuras.length}`);
+    // console.log(`   Registros que devem passar no filtro: ${dados.length - futuras.length}`);
 
-    console.log("🔍 === FIM DEBUG ===\n");
+    // console.log("🔍 === FIM DEBUG ===\n");
 }
 
 // Para usar o debug, chame: debugDatas(dadosExcel) no console do navegador
@@ -1481,9 +1579,9 @@ async function atualizarEstatisticas() {
         return statusPendente;
     });
 
-    console.log(`📊 Estatísticas - Total de dados: ${dados.length}`);
-    console.log(`📊 Estatísticas - Filtrados por data (até hoje): ${dadosFiltradosPorData.length}`);
-    console.log(`📊 Estatísticas - Pendentes até hoje: ${pendentes.length}`);
+    // console.log(`📊 Estatísticas - Total de dados: ${dados.length}`);
+    // console.log(`📊 Estatísticas - Filtrados por data (até hoje): ${dadosFiltradosPorData.length}`);
+    // console.log(`📊 Estatísticas - Pendentes até hoje: ${pendentes.length}`);
 
     document.getElementById('totalPendentes').textContent = pendentes.length;
 
@@ -1568,14 +1666,14 @@ async function atualizarEstatisticas() {
 
 // 🔍 Função de debug para analisar prazos fatais
 function debugPrazosFatais(dados) {
-    console.log("🚨 === DEBUG PRAZOS FATAIS ===");
+    // console.log("🚨 === DEBUG PRAZOS FATAIS ===");
 
     const hoje = new Date();
     hoje.setHours(23, 59, 59, 999);
     const seteDiasDepois = new Date(hoje);
     seteDiasDepois.setDate(hoje.getDate() + 7);
 
-    console.log(`📅 Período de análise: ${hoje.toLocaleDateString('pt-BR')} até ${seteDiasDepois.toLocaleDateString('pt-BR')}`);
+    // console.log(`📅 Período de análise: ${hoje.toLocaleDateString('pt-BR')} até ${seteDiasDepois.toLocaleDateString('pt-BR')}`);
 
     // Campos que podem indicar prazo fatal
     const camposPrazoFatal = [
@@ -1594,7 +1692,7 @@ function debugPrazosFatais(dados) {
         "Prazo"
     ];
 
-    console.log("\n🔍 Analisando campos de prazo fatal disponíveis:");
+    // console.log("\n🔍 Analisando campos de prazo fatal disponíveis:");
     camposPrazoFatal.forEach(campo => {
         const valores = dados
             .map(item => item[campo])
@@ -1602,15 +1700,15 @@ function debugPrazosFatais(dados) {
             .slice(0, 10); // Primeiros 10 valores únicos
 
         if (valores.length > 0) {
-            console.log(`   ${campo}: ${[...new Set(valores)].join(', ')}`);
+            // console.log(`   ${campo}: ${[...new Set(valores)].join(', ')}`);
         }
     });
 
-    console.log("\n🔍 Analisando campos de data disponíveis:");
+    // console.log("\n🔍 Analisando campos de data disponíveis:");
     camposData.forEach(campo => {
         const count = dados.filter(item => item[campo] && item[campo] !== "" && item[campo] !== "-").length;
         if (count > 0) {
-            console.log(`   ${campo}: ${count} registros com data`);
+            // console.log(`   ${campo}: ${count} registros com data`);
         }
     });
 
@@ -1629,10 +1727,10 @@ function debugPrazosFatais(dados) {
         });
     });
 
-    console.log(`\n📊 Registros com prazo fatal = "Sim": ${comPrazoFatal.length}`);
+    // console.log(`\n📊 Registros com prazo fatal = "Sim": ${comPrazoFatal.length}`);
 
     // Mostra alguns exemplos
-    console.log("\n🔍 Primeiros 5 exemplos de prazos fatais:");
+    // console.log("\n🔍 Primeiros 5 exemplos de prazos fatais:");
     comPrazoFatal.slice(0, 5).forEach((item, i) => {
         const processoId = item["Processo - ID"] || "N/A";
 
@@ -1648,10 +1746,10 @@ function debugPrazosFatais(dados) {
         const campoComData = camposData.find(campo => item[campo] && item[campo] !== "" && item[campo] !== "-");
         const data = campoComData ? item[campoComData] : "Sem data";
 
-        console.log(`   ${i + 1}. Processo ${processoId}: ${campoComPrazo} = "${item[campoComPrazo]}" | Data: ${data}`);
+        // console.log(`   ${i + 1}. Processo ${processoId}: ${campoComPrazo} = "${item[campoComPrazo]}" | Data: ${data}`);
     });
 
-    console.log("🚨 === FIM DEBUG ===\n");
+    // console.log("🚨 === FIM DEBUG ===\n");
 
     return {
         totalComPrazoFatal: comPrazoFatal.length,
@@ -1676,9 +1774,9 @@ function filtrarDadosProximos7Dias(dados) {
     seteDiasDepois.setDate(hoje.getDate() + 7);
     seteDiasDepois.setHours(23, 59, 59, 999); // Final do 7º dia
 
-    console.log(`🔍 Filtrando próximos 7 dias:`);
-    console.log(`   📅 A partir de: ${hoje.toLocaleDateString('pt-BR')}`);
-    console.log(`   📅 Até: ${seteDiasDepois.toLocaleDateString('pt-BR')}`);
+    // console.log(`🔍 Filtrando próximos 7 dias:`);
+    // console.log(`   📅 A partir de: ${hoje.toLocaleDateString('pt-BR')}`);
+    // console.log(`   📅 Até: ${seteDiasDepois.toLocaleDateString('pt-BR')}`);
 
     const dadosFiltrados = dados.filter(item => {
         const dataStr = item["Data do agendamento"];
@@ -1728,13 +1826,13 @@ function filtrarDadosProximos7Dias(dados) {
         return dataValida;
     });
 
-    console.log(`📊 Total de registros originais: ${dados.length}`);
-    console.log(`📊 Registros dos próximos 7 dias: ${dadosFiltrados.length}`);
+    // console.log(`📊 Total de registros originais: ${dados.length}`);
+    // console.log(`📊 Registros dos próximos 7 dias: ${dadosFiltrados.length}`);
 
     // Debug: mostra as 5 primeiras datas filtradas
-    console.log('✅ Primeiras 5 datas dos próximos 7 dias:');
+    // console.log('✅ Primeiras 5 datas dos próximos 7 dias:');
     dadosFiltrados.slice(0, 5).forEach((item, i) => {
-        console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
+        // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
     });
 
     return dadosFiltrados;
@@ -1745,7 +1843,7 @@ function filtrarDadosFuturos(dados) {
     const hoje = new Date();
     hoje.setHours(23, 59, 59, 999); // Final do dia de hoje
 
-    console.log(`🔍 Filtrando todas as atividades futuras a partir de: ${hoje.toLocaleDateString('pt-BR')}`);
+    // console.log(`🔍 Filtrando todas as atividades futuras a partir de: ${hoje.toLocaleDateString('pt-BR')}`);
 
     const dadosFiltrados = dados.filter(item => {
         const dataStr = item["Data do agendamento"];
@@ -1795,13 +1893,13 @@ function filtrarDadosFuturos(dados) {
         return dataValida;
     });
 
-    console.log(`📊 Total de registros originais: ${dados.length}`);
-    console.log(`📊 Registros futuros: ${dadosFiltrados.length}`);
+    // console.log(`📊 Total de registros originais: ${dados.length}`);
+    // console.log(`📊 Registros futuros: ${dadosFiltrados.length}`);
 
     // Debug: mostra as 5 primeiras datas filtradas
-    console.log('✅ Primeiras 5 datas futuras:');
+    // console.log('✅ Primeiras 5 datas futuras:');
     dadosFiltrados.slice(0, 5).forEach((item, i) => {
-        console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
+        // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
     });
 
     return dadosFiltrados;
@@ -1813,8 +1911,8 @@ function gerarGraficoPorColunaComFiltro(coluna, dados, canvasId, cor = CORES.rox
     let dadosFiltrados = dados;
     if (filtroCallback && typeof filtroCallback === 'function') {
         dadosFiltrados = filtroCallback(dados);
-        console.log(`🎯 Gráfico "${coluna}" - Total original: ${dados.length}`);
-        console.log(`🎯 Gráfico "${coluna}" - Filtrado: ${dadosFiltrados.length} registros`);
+        // console.log(`🎯 Gráfico "${coluna}" - Total original: ${dados.length}`);
+        // console.log(`🎯 Gráfico "${coluna}" - Filtrado: ${dadosFiltrados.length} registros`);
     }
 
     const contagem = {};
@@ -1874,7 +1972,7 @@ function gerarGraficoPorColunaComFiltro(coluna, dados, canvasId, cor = CORES.rox
                     });
                 }
 
-                console.log(`🔍 Clique no gráfico "${coluna}": ${valorClicado} - ${resultados.length} resultados`);
+                // console.log(`🔍 Clique no gráfico "${coluna}": ${valorClicado} - ${resultados.length} resultados`);
 
                 exibirTabela(canvasId, resultados);
             },
@@ -1917,6 +2015,261 @@ function gerarGraficoPorColunaComFiltro(coluna, dados, canvasId, cor = CORES.rox
 
     return chart;
 }
+
+// 📅 Função para gerar gráfico de linha do volume de prazos por dia
+function gerarGraficoVolumePrazosDiario(dados, canvasId) {
+    const contagemPorDia = {};
+    const registrosPorDia = {}; // Para armazenar registros para o modal
+
+    // Processa todos os dados com datas válidas
+    dados.forEach(item => {
+        const dataStr = item["Data do agendamento"];
+
+        // Ignora registros sem data ou com data vazia
+        if (!dataStr || dataStr === "" || dataStr === "-") return;
+
+        let dataAgendamento = null;
+
+        // Como as datas já estão em formato pt-BR (DD/MM/YYYY), processa diretamente
+        if (typeof dataStr === 'string' && dataStr.includes('/')) {
+            // Remove a parte do horário se existir (DD/MM/YYYY HH:MM)
+            const parteData = dataStr.split(' ')[0];
+            const partes = parteData.split('/');
+
+            if (partes.length === 3) {
+                const dia = parseInt(partes[0]);
+                const mes = parseInt(partes[1]) - 1; // Mês em JS é 0-11
+                const ano = parseInt(partes[2]);
+
+                // Validação básica dos valores
+                if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11 && ano >= 2000) {
+                    dataAgendamento = new Date(ano, mes, dia);
+                }
+            }
+        }
+
+        // Se não conseguiu parsear, tenta outros formatos (fallback)
+        if (!dataAgendamento && dataStr) {
+            try {
+                dataAgendamento = new Date(dataStr);
+            } catch (e) {
+                console.warn(`Erro ao parsear data: ${dataStr}`);
+                return;
+            }
+        }
+
+        // Verifica se a data é válida
+        if (!dataAgendamento || isNaN(dataAgendamento.getTime())) {
+            console.warn(`Data inválida encontrada: "${dataStr}"`);
+            return;
+        }
+
+        // Cria chave no formato DD/MM/YYYY para agrupamento
+        const chaveData = `${String(dataAgendamento.getDate()).padStart(2, '0')}/${String(dataAgendamento.getMonth() + 1).padStart(2, '0')}/${dataAgendamento.getFullYear()}`;
+        
+        // Conta ocorrências por dia
+        contagemPorDia[chaveData] = (contagemPorDia[chaveData] || 0) + 1;
+
+        // Armazena registros para o modal
+        if (!registrosPorDia[chaveData]) {
+            registrosPorDia[chaveData] = [];
+        }
+        registrosPorDia[chaveData].push(item);
+    });
+
+    // Ordena as datas cronologicamente
+    const datasOrdenadas = Object.keys(contagemPorDia).sort((a, b) => {
+        const [diaA, mesA, anoA] = a.split('/').map(Number);
+        const [diaB, mesB, anoB] = b.split('/').map(Number);
+        const dataA = new Date(anoA, mesA - 1, diaA);
+        const dataB = new Date(anoB, mesB - 1, diaB);
+        return dataA - dataB;
+    });
+
+    const valores = datasOrdenadas.map(data => contagemPorDia[data]);
+
+    // Identifica o dia de hoje para destacar no gráfico
+    const hoje = new Date();
+    const hojeStr = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`;
+
+    // Cria cores diferenciadas: passado (azul), hoje (laranja), futuro (verde)
+    const coresPontos = datasOrdenadas.map(data => {
+        const [dia, mes, ano] = data.split('/').map(Number);
+        const dataAtual = new Date(ano, mes - 1, dia);
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        if (data === hojeStr) {
+            return '#FF9F40'; // Laranja para hoje
+        } else if (dataAtual < hoje) {
+            return '#36A2EB'; // Azul para passado
+        } else {
+            return '#4BC0C0'; // Verde para futuro
+        }
+    });
+
+    const ctx = document.getElementById(canvasId).getContext("2d");
+
+    const chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: datasOrdenadas,
+            datasets: [{
+                label: "Volume de Prazos por Dia",
+                data: valores,
+                fill: true,
+                borderColor: CORES.azul.borda,
+                backgroundColor: CORES.azul.fundo,
+                tension: 0.3,
+                pointRadius: 4,
+                pointHoverRadius: 8,
+                pointBackgroundColor: coresPontos,
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            onClick: (e, elements) => {
+                if (elements.length === 0) return;
+
+                const index = elements[0].index;
+                const dataClicada = chart.data.labels[index];
+                const registros = registrosPorDia[dataClicada] || [];
+
+                if (registros.length > 0) {
+                    console.log(`🔍 Clique no gráfico de volume diário: ${dataClicada} - ${registros.length} atividades`);
+                    exibirTabela(canvasId, registros);
+                }
+            },
+            plugins: {
+                datalabels: {
+                    display: false // Desabilita labels nos pontos para não poluir
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            const data = context[0].label;
+                            const [dia, mes, ano] = data.split('/').map(Number);
+                            const dataObj = new Date(ano, mes - 1, dia);
+                            const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                            const diaSemana = diasSemana[dataObj.getDay()];
+                            return `${diaSemana}, ${data}`;
+                        },
+                        label: function(context) {
+                            const quantidade = context.parsed.y;
+                            return `${quantidade} ${quantidade === 1 ? 'atividade' : 'atividades'}`;
+                        },
+                        afterLabel: function(context) {
+                            const data = context.label;
+                            const hoje = new Date();
+                            const hojeStr = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`;
+                            
+                            if (data === hojeStr) {
+                                return '📅 Hoje';
+                            }
+                            
+                            const [dia, mes, ano] = data.split('/').map(Number);
+                            const dataAtual = new Date(ano, mes - 1, dia);
+                            hoje.setHours(0, 0, 0, 0);
+                            
+                            if (dataAtual < hoje) {
+                                return '⏪ Passado';
+                            } else {
+                                return '⏩ Futuro';
+                            }
+                        }
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Número de Atividades'
+                    },
+                    ticks: {
+                        stepSize: 1 // Força números inteiros no eixo Y
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Data (DD/MM/YYYY)'
+                    },
+                    ticks: {
+                        maxTicksLimit: 15, // Limita o número de labels no eixo X
+                        callback: function(value, index) {
+                            // Mostra apenas algumas datas para não poluir o eixo
+                            const totalDatas = this.chart.data.labels.length;
+                            const intervalo = Math.ceil(totalDatas / 10);
+                            return index % intervalo === 0 ? this.chart.data.labels[index] : '';
+                        }
+                    }
+                }
+            },
+            elements: {
+                point: {
+                    hoverRadius: 8
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+
+    return chart;
+}
+
+// 📊 Função para adicionar o gráfico de volume diário
+async function adicionarGraficoVolumePrazosDiario() {
+    const dados = await carregarExcel();
+    const id = "graficoVolumePrazosDiario";
+
+    // Remove gráfico anterior se existir
+    const graficoExistente = document.getElementById(id);
+    if (graficoExistente) {
+        graficoExistente.closest('.grafico-container').remove();
+    }
+
+    const container = document.createElement("div");
+    container.className = "grafico-container";
+    container.innerHTML = `
+        <div class="grafico-header">
+            <strong>📈 Volume de Prazos por Dia</strong>
+            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                🔵 Passado | 🟠 Hoje | 🟢 Futuro | Clique nos pontos para ver detalhes
+            </div>
+        </div>
+        <canvas id="${id}" style="max-height: 450px;"></canvas>
+    `;
+
+    document.getElementById("graficos").appendChild(container);
+    
+    const chart = gerarGraficoVolumePrazosDiario(dados, id);
+    charts[id] = { chart, coluna: "Volume Diário" };
+
+    // Estatísticas do gráfico
+    const totalDias = Object.keys(chart.data.labels).length;
+    const totalAtividades = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+    const mediaDiaria = (totalAtividades / totalDias).toFixed(1);
+    const maiorVolume = Math.max(...chart.data.datasets[0].data);
+
+    console.log(`📊 Gráfico de Volume Diário criado:`);
+    console.log(`   📅 Total de dias: ${totalDias}`);
+    console.log(`   📋 Total de atividades: ${totalAtividades}`);
+    console.log(`   📊 Média diária: ${mediaDiaria} atividades`);
+    console.log(`   🔥 Maior volume em um dia: ${maiorVolume} atividades`);
+
+    return chart;
+}
+
+// 🚀 Para adicionar o gráfico, chame:
+// adicionarGraficoVolumePrazosDiario();
 
 // 🆕 Função para gerar gráfico dos próximos 7 dias
 async function adicionarGraficoProximos7Dias(coluna) {
@@ -2186,10 +2539,13 @@ window.onload = async () => {
         await adicionarGraficoPizza();
 
         // 📈 Gráfico de evolução mensal
-        await adicionarGraficoEvolucaoMensal();
+        // await adicionarGraficoEvolucaoMensal();
 
         // 🧑‍💼 Gráfico radar de responsáveis
         await adicionarGraficoRadarResponsaveis();
+
+        // 📊 Gráfico de volume de prazos por dia
+        await adicionarGraficoVolumePrazosDiario();
 
 
         // 🗓️ Gráfico de próximos 7 dias
@@ -2214,7 +2570,7 @@ window.onload = async () => {
             loadingOverlay.style.display = 'none';
         }
 
-        console.log('✅ Dashboard carregado com sucesso!');
+        // console.log('✅ Dashboard carregado com sucesso!');
 
     } catch (error) {
         console.error('❌ Erro ao carregar dashboard:', error);
