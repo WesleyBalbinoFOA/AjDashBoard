@@ -13,6 +13,17 @@ let dadosExcel = [];
 // 📊 Armazena instâncias de gráficos
 const charts = {}; 
 
+// função pra limpar a biblioteca localStorage
+
+function limparLocalStorage() {
+    localStorage.removeItem("dadosExcel");
+    localStorage.removeItem("ultimaAtualizacaoExcel");
+}
+limparLocalStorage(); // Chama a função para limpar o localStorage
+document.querySelector("#logo").addEventListener("click", () => location.reload()); // Adiciona evento de clique no logo
+
+
+
 // Função para obter metadados do Excel (espera um blob)
 async function obterMetadadosExcel(blob) {
     const zip = await JSZip.loadAsync(blob);
