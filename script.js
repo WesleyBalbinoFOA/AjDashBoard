@@ -10,91 +10,60 @@ const CORES = {
 const excelUrl = "https://fundacaooswaldoaranha-my.sharepoint.com/personal/wesley_balbino_foa_org_br/_layouts/15/download.aspx?share=EdsT2JkTPstFhYTAoyB0kWwB0T83o-R9AR4Wu2Yex8hxBw";
 // 🗂️ Variável global para armazenar os dados do Excel
 let dadosExcel = [];
+
+let dataB3 = null; // 🆕 Nova variável para armazenar a data da célula B3
+let dataB3Formatada = null; // 🆕 Data B3 em formato pt-BR
+
 // 📊 Armazena instâncias de gráficos
 const charts = {}; 
 
-// função pra limpar a biblioteca localStorage
+
 
 function limparLocalStorage() {
     localStorage.removeItem("dadosExcel");
     localStorage.removeItem("ultimaAtualizacaoExcel");
+    localStorage.removeItem("dataB3");           // 🆕
+    localStorage.removeItem("dataB3Formatada");  // 🆕
 }
+
 limparLocalStorage(); // Chama a função para limpar o localStorage
 document.querySelector("#logo").addEventListener("click", () => location.reload()); // Adiciona evento de clique no logo
 
 
-
-// Função para obter metadados do Excel (espera um blob)
-async function obterMetadadosExcel(blob) {
-    const zip = await JSZip.loadAsync(blob);
-    const coreXml = await zip.file("docProps/core.xml").async("string");
-
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(coreXml, "text/xml");
-
-    const ns = {
-        dcterms: "http://purl.org/dc/terms/",
-    };
-
-    function getText(tag) {
-        const el = xmlDoc.getElementsByTagNameNS(ns.dcterms, tag)[0];
-        return el ? el.textContent : null;
+// 🆕 Função para exibir a data B3 na interface
+function exibirDataB3() {
+    const { formatada } = obterDataB3();
+    
+    // Cria ou atualiza elemento para mostrar a data B3
+    let elementoDataB3 = document.getElementById('dataB3Info');
+    
+    if (!elementoDataB3) {
+        // Cria o elemento se não existir
+        elementoDataB3 = document.createElement('div');
+        elementoDataB3.id = 'dataB3Info';
+        elementoDataB3.className = 'card-panel blue lighten-5';
+        elementoDataB3.style.marginTop = '20px';
+        elementoDataB3.style.textAlign = 'center';
+        
+        // Adiciona ao container principal (você pode mudar o local)
+        const container = document.querySelector('.container') || document.body;
+        container.insertBefore(elementoDataB3, container.firstChild);
     }
-
-    return {
-        criadoEm: getText("created"),
-        modificadoEm: getText("modified")
-    };
-}
-
-// 🔁 Função principal: baixa o Excel, extrai metadados e lê os dados
-async function carregarExcelComMetadados() {
-    try {
-        // console.log("📥 Carregando dados do Excel...");
-
-        const response = await fetch(excelUrl);
-
-        // ⚠️ Clonar resposta para usar dois blobs distintos
-        const blobMetadados = await response.clone().blob();
-        const blobPlanilha = await response.blob();
-
-        // 🔍 Extrair metadados
-        const meta = await obterMetadadosExcel(blobMetadados);
-
-        console.group("📊 Metadados do Arquivo Excel");
-        // console.log("🔗 URL:", excelUrl);
-        // console.log("📅 Criado em (UTC):", meta.criadoEm);
-        // console.log("🕓 Modificado em (UTC):", meta.modificadoEm);
-
-        if (meta.modificadoEm) {
-            const dataModificacao = new Date(meta.modificadoEm);
-            const localTime = dataModificacao.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-            // console.log("🇧🇷 Modificado em (Horário de Brasília):", localTime);
-
-            localStorage.setItem("ultimaAtualizacaoExcel", dataModificacao.toISOString());
-            // console.log("💾 Data de modificação salva no localStorage como 'ultimaAtualizacaoExcel'");
-        } else {
-            console.warn("⚠️ Metadado de modificação não encontrado.");
-        }
-        console.groupEnd();
-
-        // 📄 Ler dados da planilha usando SheetJS (xlsx.js)
-        const arrayBuffer = await blobPlanilha.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: "array" });
-
-        // Exemplo: pegar dados da primeira aba
-        const primeiraAba = workbook.SheetNames[0];
-        const dados = XLSX.utils.sheet_to_json(workbook.Sheets[primeiraAba]);
-
-        dadosExcel = dados; // Salvar para uso futuro
-
-        // console.log(`📄 Dados brutos carregados: ${dados.length} registros`);
-        // Você pode agora processar ou exibir `dados`
-
-    } catch (error) {
-        console.error("❌ Erro ao carregar o Excel ou seus metadados:", error);
+    
+    // Atualiza o conteúdo
+    if (formatada) {
+        elementoDataB3.innerHTML = `
+            <h6><i class="material-icons">schedule</i> Data da Célula B3</h6>
+            <p><strong>${formatada}</strong></p>
+        `;
+    } else {
+        elementoDataB3.innerHTML = `
+            <h6><i class="material-icons">error</i> Data B3 não encontrada</h6>
+            <p><em>Célula B3 vazia ou não localizada</em></p>
+        `;
     }
 }
+
 
 // ⏱️ Verifica se já passou do horário limite (08:15)
 function deveAtualizarDados() {
@@ -103,62 +72,6 @@ function deveAtualizarDados() {
     const horarioManha = 8 + 15 / 60;  // 8:15
     return horaAtual >= horarioManha;
 }
-
-// 📆 Verifica se os dados foram atualizados hoje e após o horário limite
-function dadosAtualizadosHoje() {
-    const ultimaAtualizacao = localStorage.getItem("ultimaAtualizacaoExcel");
-    if (!ultimaAtualizacao) return false;
-
-    const dataUltimaAtualizacao = new Date(ultimaAtualizacao);
-    const hoje = new Date();
-
-    if (dataUltimaAtualizacao.toDateString() !== hoje.toDateString()) return false;
-
-    const horaAtualizacao = dataUltimaAtualizacao.getHours() + dataUltimaAtualizacao.getMinutes() / 60;
-    const horarioManha = 8 + 15 / 60;
-    return horaAtualizacao >= horarioManha;
-}
-
-// 🆕 Atualiza e exibe os metadados do Excel no console + salva no localStorage
-async function atualizarMetadadosDoExcel() {
-    try {
-        const response = await fetch(excelUrl);
-        const blob = await response.blob();
-        const meta = await obterMetadadosExcel(blob);
-
-        console.group("📊 Metadados do Arquivo Excel");
-        // console.log("🔗 URL:", excelUrl);
-        // console.log("📅 Criado em (UTC):", meta.criadoEm);
-        // console.log("🕓 Modificado em (UTC):", meta.modificadoEm);
-
-        if (meta.modificadoEm) {
-            const dataModificacao = new Date(meta.modificadoEm);
-            const localTime = dataModificacao.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-            // console.log("🇧🇷 Modificado em (Horário de Brasília):", localTime);
-
-            localStorage.setItem("ultimaAtualizacaoExcel", dataModificacao.toISOString());
-            // console.log("💾 Data de modificação salva no localStorage como 'ultimaAtualizacaoExcel'");
-        } else {
-            console.warn("⚠️ Metadado de modificação não encontrado.");
-        }
-
-        console.groupEnd();
-    } catch (error) {
-        console.error("❌ Erro ao obter metadados do Excel:", error);
-    }
-}
-
-// 📌 Inicia a leitura dos metadados e dados ao carregar a página
-(async () => {
-    // Só carrega os dados se ainda não tiver atualizado hoje após 08:15
-    if (!dadosAtualizadosHoje() && deveAtualizarDados()) {
-        await carregarExcelComMetadados();
-    } else {
-        // console.log("🟢 Dados já atualizados hoje após o horário limite.");
-        await atualizarMetadadosDoExcel();
-    }
-})();
-
 
 
 function exibirUltimaAtualizacao() {
@@ -173,22 +86,11 @@ function exibirUltimaAtualizacao() {
     }
 
     try {
-        const data = new Date(raw);
-        const dataFormatada = data.toLocaleDateString("pt-BR", {
-            day: "2-digit",
-            month: "long",
-            year: "numeric"
-        });
-
-        const hora = data.toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit"
-        });
-
+      
         el.innerHTML = `
         <span title="${raw}">
             <i class="material-icons">update</i>
-            Atualizado em <strong>${dataFormatada}</strong> às <strong>${hora}</strong>
+            Atualizado em ${dataB3Formatada}
         </span>
         `;
     } catch (e) {
@@ -281,22 +183,143 @@ function converterDataExcelParaPtBR(valorData) {
     return valorData;
 }
 
-async function carregarExcel() {
-    if (dadosExcel.length && dadosAtualizadosHoje()) {
-        return dadosExcel;
+// 🆕 Função para converter data do Excel para pt-BR com hora
+function converterDataExcelParaPtBRComHora(valorData) {
+    if (!valorData || valorData === "-" || valorData === "") return valorData;
+
+    // Se já estiver em formato de string pt-BR, retorna como está
+    if (typeof valorData === 'string' && valorData.includes('/')) {
+        return valorData;
     }
 
-    // 🆕 Verifica se deve forçar atualização baseado no horário
-    const forcarAtualizacao = deveAtualizarDados() && !dadosAtualizadosHoje();
+    // Se for número serial do Excel, converte
+    if (typeof valorData === 'number' && valorData > 0) {
+        try {
+            // Excel conta dias desde 01/01/1900, mas com bug do ano 1900
+            // Ajuste para JavaScript (que conta desde 01/01/1970)
+            const diasDesde1900 = valorData - 25569;
+            
+            // 🔧 CORREÇÃO: Cria a data em UTC primeiro para evitar problemas de fuso horário
+            const dataUTC = new Date(diasDesde1900 * 86400 * 1000);
+            
+            // 🔧 Ajusta o fuso horário para o Brasil (UTC-3)
+            // Como o Excel não considera fuso horário, precisamos ajustar manualmente
+            const offsetBrasil = +6 * 60; // -3 horas em minutos
+            const offsetLocal = dataUTC.getTimezoneOffset(); // Offset local em minutos
+            const diferencaOffset = offsetBrasil - offsetLocal;
+            
+            // Aplica o ajuste
+            const dataAjustada = new Date(dataUTC.getTime() + (diferencaOffset * 60 * 1000));
+
+            // Verifica se a data é válida
+            if (isNaN(dataAjustada.getTime())) {
+                console.warn(`Data inválida do Excel: ${valorData}`);
+                return valorData;
+            }
+
+            // Formatar para DD/MM/AAAA HH:MM:SS
+            const dia = String(dataAjustada.getDate()).padStart(2, '0');
+            const mes = String(dataAjustada.getMonth() + 1).padStart(2, '0');
+            const ano = dataAjustada.getFullYear();
+            const horas = String(dataAjustada.getHours()).padStart(2, '0');
+            const minutos = String(dataAjustada.getMinutes()).padStart(2, '0');
+            const segundos = String(dataAjustada.getSeconds()).padStart(2, '0');
+
+            // Sempre inclui hora, minuto e segundo para B3
+            return `${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}`;
+
+        } catch (e) {
+            console.warn(`Erro ao converter data do Excel: ${valorData}`, e);
+            return valorData;
+        }
+    }
+
+    // Tenta converter outros formatos de data
+    if (valorData instanceof Date) {
+        const dia = String(valorData.getDate()).padStart(2, '0');
+        const mes = String(valorData.getMonth() + 1).padStart(2, '0');
+        const ano = valorData.getFullYear();
+        const horas = String(valorData.getHours()).padStart(2, '0');
+        const minutos = String(valorData.getMinutes()).padStart(2, '0');
+        const segundos = String(valorData.getSeconds()).padStart(2, '0');
+
+        return `${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}`;
+    }
+
+    // Se for string, tenta converter
+    if (typeof valorData === 'string') {
+        try {
+            const data = new Date(valorData);
+            if (!isNaN(data.getTime())) {
+                const dia = String(data.getDate()).padStart(2, '0');
+                const mes = String(data.getMonth() + 1).padStart(2, '0');
+                const ano = data.getFullYear();
+                const horas = String(data.getHours()).padStart(2, '0');
+                const minutos = String(data.getMinutes()).padStart(2, '0');
+                const segundos = String(data.getSeconds()).padStart(2, '0');
+
+                return `${dia}/${mes}/${ano} ${horas}:${minutos}:${segundos}`;
+            }
+        } catch (e) {
+            // Se não conseguir converter, retorna o valor original
+        }
+    }
+
+    return valorData;
+}
+
+
+// 🆕 Função para capturar dados específicos de células
+function capturarDadosCelulas(worksheet) {
+    try {
+        // Captura a célula B3
+        const celulaB3 = worksheet['B3'];
+        
+        if (celulaB3 && celulaB3.v !== undefined) {
+            dataB3 = celulaB3.v; // Valor bruto da célula
+            dataB3Formatada = converterDataExcelParaPtBRComHora(celulaB3.v);
+            
+            console.log(`📅 Célula B3 capturada:`);
+            console.log(`   Valor bruto: ${dataB3}`);
+            console.log(`   Formatado: ${dataB3Formatada}`);
+        } else {
+            console.warn('⚠️ Célula B3 não encontrada ou vazia');
+            dataB3 = null;
+            dataB3Formatada = null;
+        }
+
+        // 🆕 Você pode capturar outras células aqui se necessário
+        // Exemplo: const celulaC3 = worksheet['C3'];
+        
+    } catch (error) {
+        console.error('❌ Erro ao capturar dados das células:', error);
+        dataB3 = null;
+        dataB3Formatada = null;
+    }
+}
+
+
+// 🔄 Função carregarExcel MODIFICADA para incluir captura da célula B3
+async function carregarExcel() {
+    if (dadosExcel.length) {
+        return dadosExcel;
+    }
 
     const dadosSalvos = localStorage.getItem("dadosExcel");
-    if (dadosSalvos && !forcarAtualizacao) {
+    const dataB3Salva = localStorage.getItem("dataB3");
+    const dataB3FormatadaSalva = localStorage.getItem("dataB3Formatada");
+    
+    if (dadosSalvos) {
         dadosExcel = JSON.parse(dadosSalvos);
-        // console.log(`✅ Dados carregados do localStorage: ${dadosExcel.length} registros`);
+        dataB3 = dataB3Salva ? JSON.parse(dataB3Salva) : null;
+        dataB3Formatada = dataB3FormatadaSalva || null;
+        
+        console.log(`✅ Dados carregados do localStorage: ${dadosExcel.length} registros`);
+        console.log(`📅 Data B3 recuperada: ${dataB3Formatada}`);
         return dadosExcel;
     }
 
-    // console.log("🔄 Carregando dados do Excel...");
+    console.log("🔄 Carregando dados do Excel...");
 
     try {
         const response = await fetch(excelUrl);
@@ -305,14 +328,18 @@ async function carregarExcel() {
 
         const workbook = XLSX.read(buffer, { type: "array" });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        
+        // 🆕 NOVA LINHA: Captura a célula B3 ANTES de processar os dados da tabela
+        capturarDadosCelulas(worksheet);
+        
         let dadosBrutos = XLSX.utils.sheet_to_json(worksheet, {
             range: 5,
             defval: ""
         });
 
-        // console.log(`📊 Dados brutos carregados: ${dadosBrutos.length} registros`);
+        console.log(`📊 Dados brutos carregados: ${dadosBrutos.length} registros`);
 
-        // 🆕 Converte todas as datas para formato pt-BR antes de salvar
+        // Converte todas as datas para formato pt-BR antes de salvar
         dadosExcel = dadosBrutos.map((registro, index) => {
             const registroConvertido = { ...registro };
 
@@ -344,19 +371,17 @@ async function carregarExcel() {
             return registroConvertido;
         });
 
-        // 🆕 Salva os dados já convertidos e marca o timestamp da atualização
+        // Salva os dados já convertidos e marca o timestamp da atualização
         localStorage.setItem("dadosExcel", JSON.stringify(dadosExcel));
         localStorage.setItem("ultimaAtualizacaoExcel", new Date().toISOString());
+        
+        // 🆕 Salva também os dados da célula B3
+        localStorage.setItem("dataB3", JSON.stringify(dataB3));
+        localStorage.setItem("dataB3Formatada", dataB3Formatada);
 
-        // console.log("✅ Dados atualizados e convertidos com sucesso!");
-        // console.log(`📊 Total de registros processados: ${dadosExcel.length}`);
-
-        // Debug das primeiras datas convertidas
-        // console.log("🔍 Primeiras 5 datas convertidas:");
-        dadosExcel.slice(0, 5).forEach((item, i) => {
-            const data = item["Data do agendamento"];
-            // console.log(`  ${i + 1}. "${data}"`);
-        });
+        console.log("✅ Dados atualizados e convertidos com sucesso!");
+        console.log(`📊 Total de registros processados: ${dadosExcel.length}`);
+        console.log(`📅 Data da célula B3: ${dataB3Formatada}`);
 
     } catch (error) {
         console.error("❌ Erro ao carregar dados do Excel:", error);
@@ -366,11 +391,23 @@ async function carregarExcel() {
     return dadosExcel;
 }
 
+
+// 🆕 Função para obter a data B3 formatada (para usar em outros lugares)
+function obterDataB3() {
+    return {
+        valorBruto: dataB3,
+        formatada: dataB3Formatada
+    };
+}
+
+
+
 // 🆕 Função simplificada para filtrar dados até hoje (datas já estão em formato pt-BR)
 function filtrarDadosAteHoje(dados) {
     const hoje = new Date();
     hoje.setHours(23, 59, 59, 999); // Final do dia
 
+    
     // console.log(`🔍 Filtrando dados até: ${hoje.toLocaleDateString('pt-BR')}`);
 
     const dadosFiltrados = dados.filter(item => {
@@ -421,14 +458,7 @@ function filtrarDadosAteHoje(dados) {
         return dataValida;
     });
 
-    // console.log(`📊 Total de registros originais: ${dados.length}`);
-    // console.log(`📊 Registros filtrados até hoje: ${dadosFiltrados.length}`);
-
-    // Debug: mostra as 5 primeiras datas filtradas
-    // console.log('✅ Primeiras 5 datas que passaram no filtro:');
-    dadosFiltrados.slice(0, 5).forEach((item, i) => {
-        // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
-    });
+  
 
     // Debug: mostra 5 datas que foram rejeitadas (futuras)
     const rejeitados = dados.filter(item => {
@@ -455,9 +485,13 @@ function filtrarDadosAteHoje(dados) {
             // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
         });
     }
-
+    
     return dadosFiltrados;
 }
+
+
+
+
 function gerarGraficoPorColuna(coluna, dados, canvasId, cor = CORES.roxo, filtrarAteHoje = false) {
     // 🆕 Aplica filtro de data se solicitado
     let dadosFiltrados = dados;
@@ -491,7 +525,7 @@ function gerarGraficoPorColuna(coluna, dados, canvasId, cor = CORES.roxo, filtra
         data: {
             labels: labels,
             datasets: [{
-                label: `Quantidade por ${coluna}${filtrarAteHoje ? ' (até 01/08/2025)' : ''}`,
+                label: `Quantidade por ${coluna}${filtrarAteHoje ? ' (até hoje)' : ''}`,
                 data: valores,
                 backgroundColor: cor.fundo,
                 borderColor: cor.borda,
@@ -1418,7 +1452,7 @@ function gerarGraficoPendenciasStacked(dados, canvasId) {
                 y: {
                     stacked: true,
                     beginAtZero: true,
-                    title: { display: true, text: 'Quantidade de Pendências (até 01/08/2025)' }
+                    title: { display: true, text: 'Quantidade de Pendências (até hoje)' }
                 }
             },
             onClick: (e, elements) => {
@@ -1454,7 +1488,7 @@ async function adicionarGraficoPendenciasPorAreaEUsuario() {
     container.className = "grafico-container";
     container.innerHTML = `
         <div class="grafico-header">
-            <strong>📌 Pendências por Responsável e Área do Direito (até 01/08/2025)</strong>
+            <strong>📌 Pendências por Responsável e Área do Direito (até hoje)</strong>
         </div>
         <canvas id="${id}" style="max-height: 500px;"></canvas>
     `;
@@ -2533,6 +2567,8 @@ window.onload = async () => {
 
         // Atualiza estatísticas
         await atualizarEstatisticas();
+       
+        // exibirDataB3();
 
         exibirUltimaAtualizacao(); // ⬅️ Adicionada aqui
 
