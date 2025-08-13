@@ -15,7 +15,7 @@
   --info-color: #00838f;                   /* Azul petróleo para neutros ou informativos */
 
   /* Estética visual */
-  --gradient-bg: linear-gradient(135deg, #abb9f8 0%, #4b82a2 100%);
+  --gradient-bg: linear-gradient(135deg, #dbdbdd 0%, #4b82a2 100%);
   --card-bg: rgba(255, 255, 255, 0.95);
   --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
