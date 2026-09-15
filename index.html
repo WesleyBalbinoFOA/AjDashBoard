@@ -13,16 +13,11 @@
   <!-- XLSX -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- Materialize CSS -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-
   <!-- Google Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -81,7 +76,7 @@
         </div>
       </div>
 
-      <div class="tile">
+      <div class="tile tile-clickable" onclick="abrirModalPorDia(0, 'Vencem hoje')" title="Ver tarefas que vencem hoje">
         <div class="tile-top">
           <div>
             <p class="tile-label">Vencem hoje</p>
@@ -93,7 +88,7 @@
         <div class="tile-bar"><span class="seg-hoje" style="width:100%"></span></div>
       </div>
 
-      <div class="tile">
+      <div class="tile tile-clickable" onclick="abrirModalPorDia(1, 'Vencem amanhã')" title="Ver tarefas que vencem amanhã">
         <div class="tile-top">
           <div>
             <p class="tile-label">Vencem amanhã</p>
@@ -105,7 +100,7 @@
         <div class="tile-bar"><span class="seg-amanha" style="width:100%"></span></div>
       </div>
 
-      <div class="tile">
+      <div class="tile tile-clickable" onclick="abrirModalPrazoFatal()" title="Ver prazos fatais em aberto">
         <div class="tile-top">
           <div>
             <p class="tile-label">Prazo fatal em aberto</p>
@@ -163,44 +158,6 @@
       </div>
       <div class="chart-box short"><canvas id="graficoStatusTarefa"></canvas></div>
     </div>
-
-    <!-- Análises detalhadas (dashboard anterior, preservado) -->
-    <details class="legacy-details" id="analisesDetalhadas">
-      <summary>Análises detalhadas</summary>
-      <div class="legacy-details-body">
-        <div class="stats-overview">
-          <div class="stat-card fade-in">
-            <i class="material-icons stat-icon blue">assignment</i>
-            <h3 class="stat-number" id="totalProcessos">-</h3>
-            <p class="stat-label">Total de Processos</p>
-          </div>
-
-          <div class="stat-card fade-in" onclick="ativarAba('audiencias')" style="cursor: pointer;">
-            <i class="material-icons stat-icon green">event_available</i>
-            <h3 class="stat-number" id="totalAudiencias">-</h3>
-            <p class="stat-label">Audiências Agendadas</p>
-          </div>
-
-          <div class="stat-card fade-in">
-            <i class="material-icons-outlined stat-icon orange">pending_actions</i>
-            <h3 class="stat-number" id="totalPendentes">-</h3>
-            <p class="stat-label">Tarefas Pendentes</p>
-          </div>
-
-          <div class="stat-card fade-in" onclick="ativarAba('prazos')" style="cursor: pointer;">
-            <i class="material-icons stat-icon red">warning</i>
-            <h3 class="stat-number" id="totalAtrasados">-</h3>
-            <p class="stat-label">Prazos de Atenção</p>
-          </div>
-        </div>
-
-        <div class="charts-grid">
-          <div id="graficos"></div>
-        </div>
-      </div>
-    </details>
-
-    <div id="relatoriosEspeciaisWrap"></div>
 
     <p class="footer-note">Dados extraídos da Pauta Diária (Excel) carregada no navegador nesta sessão.</p>
   </section>
@@ -278,15 +235,19 @@
 
   </div>
 
-  <!-- Materialize JS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-
+  <!-- Modal genérico (listagens dos tiles clicáveis) -->
+  <div id="modalOverlay" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h4 class="modal-title" id="modalTitulo">-</h4>
+        <button type="button" class="modal-close" onclick="fecharModal()" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-body" id="modalCorpo"></div>
+    </div>
+  </div>
 
   <!-- Main Script -->
   <script src="script.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-
 
 </body>
 

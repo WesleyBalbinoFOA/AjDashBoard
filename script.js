@@ -1,11 +1,3 @@
-const CORES = {
-    roxo: { fundo: "rgba(153, 102, 255, 0.5)", borda: "rgba(153, 102, 255, 1)" },
-    vermelho: { fundo: "rgba(255, 99, 132, 0.5)", borda: "rgba(255, 99, 132, 1)" },
-    azul: { fundo: "rgba(54, 162, 235, 0.5)", borda: "rgba(54, 162, 235, 1)" },
-    verde: { fundo: "rgba(75, 192, 192, 0.5)", borda: "rgba(75, 192, 192, 1)" },
-    laranja: { fundo: "rgba(255, 159, 64, 0.5)", borda: "rgba(255, 159, 64, 1)" }
-};
-
 // 📦 Importa a URL do arquivo url.js
 const excelUrl = "https://fundacaooswaldoaranha-my.sharepoint.com/personal/wesley_balbino_foa_org_br/_layouts/15/download.aspx?share=EdsT2JkTPstFhYTAoyB0kWwB0T83o-R9AR4Wu2Yex8hxBw";
 // 🗂️ Variável global para armazenar os dados do Excel
@@ -397,286 +389,6 @@ function obterDataB3() {
     };
 }
 
-
-
-// 🆕 Função simplificada para filtrar dados até hoje (datas já estão em formato pt-BR)
-function filtrarDadosAteHoje(dados) {
-    const hoje = new Date();
-    hoje.setHours(23, 59, 59, 999); // Final do dia
-
-    
-    // console.log(`🔍 Filtrando dados até: ${hoje.toLocaleDateString('pt-BR')}`);
-
-    const dadosFiltrados = dados.filter(item => {
-        const dataStr = item["Data do agendamento"];
-
-        // Ignora registros sem data ou com data vazia
-        if (!dataStr || dataStr === "" || dataStr === "-") return false;
-
-        let dataAgendamento = null;
-
-        // Como as datas já estão em formato pt-BR (DD/MM/YYYY), processa diretamente
-        if (typeof dataStr === 'string' && dataStr.includes('/')) {
-            // Remove a parte do horário se existir (DD/MM/YYYY HH:MM)
-            const parteData = dataStr.split(' ')[0];
-            const partes = parteData.split('/');
-
-            if (partes.length === 3) {
-                const dia = parseInt(partes[0]);
-                const mes = parseInt(partes[1]) - 1; // Mês em JS é 0-11
-                const ano = parseInt(partes[2]);
-
-                // Validação básica dos valores
-                if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11 && ano >= 2000) {
-                    dataAgendamento = new Date(ano, mes, dia);
-                }
-            }
-        }
-
-        // Se não conseguiu parsear, tenta outros formatos (fallback)
-        if (!dataAgendamento && dataStr) {
-            try {
-                dataAgendamento = new Date(dataStr);
-            } catch (e) {
-                console.warn(`Erro ao parsear data: ${dataStr}`);
-                return false;
-            }
-        }
-
-        // Verifica se a data é válida
-        if (!dataAgendamento || isNaN(dataAgendamento.getTime())) {
-            console.warn(`Data inválida encontrada: "${dataStr}"`);
-            return false;
-        }
-
-        // Verifica se a data é até hoje (inclusive)
-        const dataValida = dataAgendamento <= hoje;
-
-        return dataValida;
-    });
-
-  
-
-    // Debug: mostra 5 datas que foram rejeitadas (futuras)
-    const rejeitados = dados.filter(item => {
-        const dataStr = item["Data do agendamento"];
-        if (!dataStr || dataStr === "" || dataStr === "-") return false;
-
-        if (typeof dataStr === 'string' && dataStr.includes('/')) {
-            const parteData = dataStr.split(' ')[0];
-            const partes = parteData.split('/');
-            if (partes.length === 3) {
-                const dia = parseInt(partes[0]);
-                const mes = parseInt(partes[1]) - 1;
-                const ano = parseInt(partes[2]);
-                const data = new Date(ano, mes, dia);
-                return data > hoje;
-            }
-        }
-        return false;
-    });
-
-    if (rejeitados.length > 0) {
-        // console.log('❌ Primeiras 5 datas futuras rejeitadas:');
-        rejeitados.slice(0, 5).forEach((item, i) => {
-            // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
-        });
-    }
-    
-    return dadosFiltrados;
-}
-
-
-
-
-function gerarGraficoPorColuna(coluna, dados, canvasId, cor = CORES.roxo, filtrarAteHoje = false) {
-    // 🆕 Aplica filtro de data se solicitado
-    let dadosFiltrados = dados;
-    if (filtrarAteHoje) {
-        dadosFiltrados = filtrarDadosAteHoje(dados);
-        // console.log(`🎯 Gráfico "${coluna}" - Total original: ${dados.length}`);
-        // console.log(`🎯 Gráfico "${coluna}" - Filtrado até hoje: ${dadosFiltrados.length} registros`);
-    }
-
-    const contagem = {};
-    dadosFiltrados.forEach(item => {
-        const chave = item[coluna];
-        if (chave && chave.trim() && chave.trim() !== "-") {
-            const chaveLimpa = chave.trim();
-            contagem[chaveLimpa] = (contagem[chaveLimpa] || 0) + 1;
-        }
-    });
-
-    const nomesCompletos = Object.keys(contagem);
-    const valores = Object.values(contagem);
-
-    // Para responsável, mostra apenas o primeiro nome no gráfico
-    const labels = nomesCompletos.map(nome => {
-        return coluna.toLowerCase() === "responsável" ? nome.split(" ")[0] : nome;
-    });
-
-    const ctx = document.getElementById(canvasId).getContext("2d");
-
-    const chart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: `Quantidade por ${coluna}${filtrarAteHoje ? ' (até hoje)' : ''}`,
-                data: valores,
-                backgroundColor: cor.fundo,
-                borderColor: cor.borda,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            onClick: (e, elements) => {
-                if (elements.length === 0) return;
-
-                const index = elements[0].index;
-                const valorClicado = chart.data.labels[index];
-
-                let resultados;
-
-                if (coluna.toLowerCase() === "responsável") {
-                    // Para responsável, encontra nomes completos que batem com o primeiro nome
-                    const nomesCorrespondentes = nomesCompletos.filter(nome => nome.startsWith(valorClicado));
-                    resultados = dadosFiltrados.filter(item =>
-                        nomesCorrespondentes.includes(item["Responsável"]?.trim())
-                    );
-                } else {
-                    // Para outras colunas, filtra diretamente pelo valor
-                    resultados = dadosFiltrados.filter(item => {
-                        const valorItem = item[coluna]?.trim();
-                        return valorItem === nomesCompletos.find(nome =>
-                            (coluna.toLowerCase() === "responsável" ? nome.split(" ")[0] : nome) === valorClicado
-                        );
-                    });
-                }
-
-                // console.log(`🔍 Clique no gráfico "${coluna}": ${valorClicado} - ${resultados.length} resultados`);
-
-                // Debug: mostra algumas datas dos resultados
-                // console.log('📅 Primeiras 5 datas dos resultados:');
-                resultados.slice(0, 5).forEach((item, i) => {
-                    // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
-                });
-
-                exibirTabela(canvasId, resultados);
-            },
-            plugins: {
-                datalabels: {
-                    anchor: 'end',
-                    align: 'top',
-                    color: '#000',
-                    font: { weight: 'bold', size: 12 },
-                    formatter: Math.round
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function (context) {
-                            const index = context[0].dataIndex;
-                            // Mostra o nome completo no tooltip
-                            return nomesCompletos[index];
-                        },
-                        label: function (context) {
-                            return `${context.dataset.label}: ${context.parsed.y}`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: `Quantidade${filtrarAteHoje ? ' (até hoje)' : ''}`
-                    }
-                },
-                x: {
-                    title: { display: true, text: coluna }
-                }
-            }
-        },
-        plugins: [ChartDataLabels]
-    });
-
-    return chart;
-}
-
-function gerarGraficoEvolucaoMensal(dados, canvasId) {
-    const contagemPorMes = {};
-
-    dados.forEach(item => {
-        const dataRaw = item["Data do agendamento"];
-        const data = new Date(dataRaw);
-        if (!isNaN(data)) {
-            const chave = `${String(data.getMonth() + 1).padStart(2, '0')}/${data.getFullYear()}`;
-            contagemPorMes[chave] = (contagemPorMes[chave] || 0) + 1;
-        }
-    });
-
-    const labels = Object.keys(contagemPorMes).sort((a, b) => {
-        const [mA, yA] = a.split("/").map(Number);
-        const [mB, yB] = b.split("/").map(Number);
-        return new Date(yA, mA - 1) - new Date(yB, mB - 1);
-    });
-
-    const valores = labels.map(label => contagemPorMes[label]);
-
-    const ctx = document.getElementById(canvasId).getContext("2d");
-
-    const chart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels,
-            datasets: [{
-                label: "Processos por Mês",
-                data: valores,
-                fill: true,
-                borderColor: CORES.azul.borda,
-                backgroundColor: CORES.azul.fundo,
-                tension: 0.2,
-                pointRadius: 5,
-                pointHoverRadius: 7
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                datalabels: {
-                    anchor: 'end',
-                    align: 'top',
-                    color: '#000',
-                    font: {
-                        weight: 'bold',
-                        size: 12
-                    },
-                    formatter: Math.round
-                },
-                tooltip: {
-                    callbacks: {
-                        label: context => `${context.parsed.y} processo(s)`
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Quantidade' }
-                },
-                x: {
-                    title: { display: true, text: 'Mês/Ano' }
-                }
-            }
-        },
-        plugins: [ChartDataLabels]
-    });
-
-    return chart;
-}
-
 // 🧹 Função para limpar o cache e forçar recarregamento dos dados
 function limparCacheERecarregar() {
     // console.log("🧹 Limpando cache e recarregando dados...");
@@ -765,693 +477,6 @@ function obterDescricao(registro) {
     return "-";
 }
 
-function exibirTabela(canvasId, registros) {
-    // Remove modal anterior se existir
-    const modalAnterior = document.getElementById('modal-tabela');
-    if (modalAnterior) {
-        modalAnterior.remove();
-    }
-
-    // Cria o modal
-    const modal = document.createElement('div');
-    modal.id = 'modal-tabela';
-    modal.className = 'modal modal-fixed-footer';
-    modal.style.maxHeight = '80%';
-
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h4>Detalhes dos Processos</h4>
-            <div style="max-height: calc(80vh - 150px); overflow-y: auto;">
-                <table class="striped highlight responsive-table">
-                    <thead>
-                        <tr>
-                            <th>ID do Processo</th>
-                            <th>Data do Agendamento</th>
-                            <th>Tipo</th>
-                            <th>Status da Tarefa</th>
-                            <th>Descrição</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${registros.map(reg => `
-                            <tr>
-                                <td>${reg["Processo - ID"] || "-"}</td>
-                                <td>${formatarDataExcel(reg["Data do agendamento"])}</td>
-                                <td>${reg["Tipo"] || "-"}</td>
-                                <td>${reg["Status da tarefa"] || "-"}</td>
-                                <td>${obterDescricao(reg)}</td>
-                            </tr>
-                        `).join("")}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <a href="#!" class="modal-close waves-effect waves-green btn-flat">Fechar</a>
-        </div>
-    `;
-
-    // Adiciona o modal ao body
-    document.body.appendChild(modal);
-
-    // Inicializa e abre o modal
-    const modalInstance = M.Modal.init(modal, {
-        dismissible: true,
-        opacity: 0.5,
-        inDuration: 300,
-        outDuration: 200
-    });
-
-    modalInstance.open();
-}
-
-async function adicionarGrafico(coluna, filtrarAteHoje = false) {
-    const dados = await carregarExcel();
-
-    const idUnico = `grafico_${Math.random().toString(36).substr(2, 9)}`;
-    const container = document.createElement("div");
-    container.className = "grafico-container";
-
-    const tituloExtra = filtrarAteHoje ? " (até hoje)" : "";
-
-    container.innerHTML = `
-        <div class="grafico-header">
-            <strong>Gráfico por ${coluna}${tituloExtra}</strong>
-            <select onchange="trocarCor('${idUnico}', '${coluna}', this.value)">
-                ${Object.keys(CORES).map(cor => `<option value="${cor}">${cor[0].toUpperCase() + cor.slice(1)}</option>`).join('')}
-            </select>
-        </div>
-        <canvas id="${idUnico}"></canvas>
-    `;
-
-    document.getElementById("graficos").appendChild(container);
-    const chart = gerarGraficoPorColuna(coluna, dados, idUnico, CORES.roxo, filtrarAteHoje);
-    charts[idUnico] = { chart, coluna };
-}
-
-function trocarCor(canvasId, coluna, corSelecionada) {
-    const { chart } = charts[canvasId];
-    const novaCor = CORES[corSelecionada];
-
-    chart.data.datasets[0].backgroundColor = novaCor.fundo;
-    chart.data.datasets[0].borderColor = novaCor.borda;
-    chart.update();
-}
-
-// 🍕 Função para gerar gráfico de pizza do Status das Tarefas
-function gerarGraficoPizza(dados, canvasId) {
-    // Conta a ocorrência de cada status
-    const contagem = {};
-    dados.forEach(item => {
-        const status = item["Status da tarefa"];
-        if (status && status.trim() && status.trim() !== "-") {
-            const statusLimpo = status.trim();
-            contagem[statusLimpo] = (contagem[statusLimpo] || 0) + 1;
-        }
-    });
-
-    const labels = Object.keys(contagem);
-    const valores = Object.values(contagem);
-
-    // Cores para o gráfico de pizza
-    const coresPizza = [
-        '#63c6ffff', '#eb367bff', '#FFCE56', '#4BC0C0', '#9966FF',
-        '#FF9F40', '#63c1ffff', '#C9CBCF', '#4BC0C0', '#FF6384'
-    ];
-
-    const ctx = document.getElementById(canvasId).getContext("2d");
-
-    const chart = new Chart(ctx, {
-        type: "pie",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Status das Tarefas',
-                data: valores,
-                backgroundColor: coresPizza.slice(0, labels.length),
-                borderColor: '#fff',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true,
-                        font: { size: 12 }
-                    }
-                },
-                datalabels: {
-                    color: '#fff',
-                    font: { weight: 'bold', size: 14 },
-                    formatter: (value, context) => {
-                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                        const porcentagem = ((value / total) * 100).toFixed(1);
-                        return `${value}\n(${porcentagem}%)`;
-                    },
-                    textAlign: 'center'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const porcentagem = ((context.parsed / total) * 100).toFixed(1);
-                            return `${context.label}: ${context.parsed} (${porcentagem}%)`;
-                        }
-                    }
-                }
-            },
-            onClick: (e, elements) => {
-                if (elements.length === 0) return;
-
-                const index = elements[0].index;
-                const statusClicado = chart.data.labels[index];
-
-                // Filtra registros pelo status clicado
-                const resultados = dados.filter(item =>
-                    item["Status da tarefa"] &&
-                    item["Status da tarefa"].trim() === statusClicado
-                );
-
-                exibirTabela(canvasId, resultados);
-            }
-        },
-        plugins: [ChartDataLabels]
-    });
-
-    return chart;
-}
-
-async function adicionarGraficoPizza() {
-    const dados = await carregarExcel();
-
-    const idUnico = `pizza_status_${Math.random().toString(36).substr(2, 9)}`;
-    const container = document.createElement("div");
-    container.className = "grafico-container";
-    container.innerHTML = `
-        <div class="grafico-header">
-            <strong>📊 Gráfico de Pizza - Status das Tarefas</strong>
-        </div>
-        <div style="width: 100%; height: 400px; display: flex; justify-content: center; align-items: center;">
-            <canvas id="${idUnico}" style="max-width: 600px; max-height: 400px;"></canvas>
-        </div>
-    `;
-
-    document.getElementById("graficos").appendChild(container);
-    const chart = gerarGraficoPizza(dados, idUnico);
-    charts[idUnico] = { chart, coluna: "Status da tarefa" };
-}
-
-function gerarTabelaPrazosFatais(dados) {
-    const hoje = new Date();
-    hoje.setHours(23, 59, 59, 999); // Final do dia de hoje
-
-    const seteDiasDepois = new Date(hoje);
-    seteDiasDepois.setDate(hoje.getDate() + 7); // 7 dias a partir de hoje
-
-    // console.log(`🚨 Analisando prazos fatais:`);
-    // console.log(`   📅 Hoje: ${hoje.toLocaleDateString('pt-BR')}`);
-    // console.log(`   📅 Limite (7 dias): ${seteDiasDepois.toLocaleDateString('pt-BR')}`);
-
-    // Função auxiliar para verificar se um campo indica "Sim" para prazo fatal
-    const temPrazoFatal = (valor) => {
-        if (!valor) return false;
-        const valorLower = valor.toString().toLowerCase().trim();
-        return valorLower === 'sim' ||
-            valorLower === 's' ||
-            valorLower === 'yes' ||
-            valorLower === 'y' ||
-            valorLower === 'true' ||
-            valorLower === '1';
-    };
-
-    // Função auxiliar para converter data pt-BR para objeto Date
-    const converterDataPtBR = (dataStr) => {
-        if (!dataStr || dataStr === "-" || dataStr === "") return null;
-
-        if (typeof dataStr === 'string' && dataStr.includes('/')) {
-            const parteData = dataStr.split(' ')[0]; // Remove horário se existir
-            const partes = parteData.split('/');
-
-            if (partes.length === 3) {
-                const dia = parseInt(partes[0]);
-                const mes = parseInt(partes[1]) - 1; // Mês em JS é 0-11
-                const ano = parseInt(partes[2]);
-
-                if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11 && ano >= 2000) {
-                    return new Date(ano, mes, dia);
-                }
-            }
-        }
-
-        return null;
-    };
-
-    // Filtra registros com prazo fatal
-    const prazosFatais = dados.filter(item => {
-        // Verifica campos que podem indicar prazo fatal
-        const campos = [
-            "Solicitação - Há Prazo Fatal",
-            "Há Prazo Fatal",
-            "Prazo Fatal",
-            "Prazo Crítico",
-            "Urgente"
-        ];
-
-        const temPrazo = campos.some(campo => temPrazoFatal(item[campo]));
-
-        if (!temPrazo) return false;
-
-        // Verifica a data de vencimento
-        const camposData = [
-            "Data do agendamento",
-            "Data de Vencimento",
-            "Data Limite",
-            "Prazo"
-        ];
-
-        let dataVencimento = null;
-
-        // Procura a primeira data válida nos campos
-        for (const campo of camposData) {
-            if (item[campo]) {
-                dataVencimento = converterDataPtBR(item[campo]);
-                if (dataVencimento) break;
-            }
-        }
-
-        if (!dataVencimento) return false;
-
-        // Inclui se está atrasado (data já passou) ou vence nos próximos 7 dias
-        const estaAtrasado = dataVencimento < hoje;
-        const venceEm7Dias = dataVencimento >= hoje && dataVencimento <= seteDiasDepois;
-
-        return estaAtrasado || venceEm7Dias;
-    });
-
-    // Separa atrasados e próximos do vencimento
-    const atrasados = prazosFatais.filter(item => {
-        const camposData = ["Data do agendamento", "Data de Vencimento", "Data Limite", "Prazo"];
-        let dataVencimento = null;
-
-        for (const campo of camposData) {
-            if (item[campo]) {
-                dataVencimento = converterDataPtBR(item[campo]);
-                if (dataVencimento) break;
-            }
-        }
-
-        return dataVencimento && dataVencimento < hoje;
-    });
-
-    const proximosVencimento = prazosFatais.filter(item => {
-        const camposData = ["Data do agendamento", "Data de Vencimento", "Data Limite", "Prazo"];
-        let dataVencimento = null;
-
-        for (const campo of camposData) {
-            if (item[campo]) {
-                dataVencimento = converterDataPtBR(item[campo]);
-                if (dataVencimento) break;
-            }
-        }
-
-        return dataVencimento && dataVencimento >= hoje && dataVencimento <= seteDiasDepois;
-    });
-
-    // Ordena por data (mais urgentes primeiro)
-    prazosFatais.sort((a, b) => {
-        const getDataVencimento = (item) => {
-            const camposData = ["Data do agendamento", "Data de Vencimento", "Data Limite", "Prazo"];
-            for (const campo of camposData) {
-                if (item[campo]) {
-                    const data = converterDataPtBR(item[campo]);
-                    if (data) return data;
-                }
-            }
-            return new Date(0); // Data muito antiga se não encontrar
-        };
-
-        return getDataVencimento(a) - getDataVencimento(b);
-    });
-
-    // console.log(`🚨 Prazos fatais encontrados: ${prazosFatais.length}`);
-    // console.log(`   ❌ Atrasados: ${atrasados.length}`);
-    // console.log(`   ⚠️ Vencem em 7 dias: ${proximosVencimento.length}`);
-
-    // Função para obter a classe CSS baseada no status do prazo
-    const getClassePrazo = (item) => {
-        const camposData = ["Data do agendamento", "Data de Vencimento", "Data Limite", "Prazo"];
-        let dataVencimento = null;
-
-        for (const campo of camposData) {
-            if (item[campo]) {
-                dataVencimento = converterDataPtBR(item[campo]);
-                if (dataVencimento) break;
-            }
-        }
-
-        if (!dataVencimento) return "yellow lighten-4";
-
-        if (dataVencimento < hoje) {
-            return "red lighten-4"; // Atrasado
-        } else if (dataVencimento <= seteDiasDepois) {
-            return "orange lighten-4"; // Vence em breve
-        } else {
-            return "green lighten-4"; // OK
-        }
-    };
-
-    // Função para obter o texto do status
-    const getStatusPrazo = (item) => {
-        const camposData = ["Data do agendamento", "Data de Vencimento", "Data Limite", "Prazo"];
-        let dataVencimento = null;
-
-        for (const campo of camposData) {
-            if (item[campo]) {
-                dataVencimento = converterDataPtBR(item[campo]);
-                if (dataVencimento) break;
-            }
-        }
-
-        if (!dataVencimento) return "⚠️ Sem data";
-
-        const diffDias = Math.ceil((dataVencimento - hoje) / (1000 * 60 * 60 * 24));
-
-        if (diffDias < 0) {
-            return `🔴 ${Math.abs(diffDias)} dia(s) atrasado`;
-        } else if (diffDias === 0) {
-            return "🟡 Vence hoje";
-        } else if (diffDias <= 7) {
-            return `🟠 Vence em ${diffDias} dia(s)`;
-        } else {
-            return `🟢 Vence em ${diffDias} dia(s)`;
-        }
-    };
-
-    const container = document.createElement("div");
-    container.className = "row";
-    container.id = "prazos-fatais";
-    container.innerHTML = `
-        <div class="col s12">
-            <div class="card">
-                <div class="card-content">
-                    <span class="card-title red-text">🚨 Prazos Fatais</span>
-                    <p class="grey-text">
-                        <strong>Critérios:</strong> Processos com prazo fatal = "Sim" que estão atrasados ou vencem nos próximos 7 dias
-                    </p>
-                    <div style="max-height: 500px; overflow-y: auto;">
-                        <table class="striped highlight responsive-table">
-                            <thead>
-                                <tr>
-                                    <th>Status do Prazo</th>
-                                    <th>Processo ID</th>
-                                    <th>Data de Vencimento</th>
-                                    <th>Responsável</th>
-                                    <th>Empresa</th>
-                                    <th>Tipo</th>
-                                    <th>Status da Tarefa</th>
-                                    <th>Descrição</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${prazosFatais.map(reg => {
-        const camposData = ["Data do agendamento", "Data de Vencimento", "Data Limite", "Prazo"];
-        let dataVencimento = "Não informada";
-
-        for (const campo of camposData) {
-            if (reg[campo]) {
-                dataVencimento = reg[campo];
-                break;
-            }
-        }
-
-        return `
-                                        <tr class="${getClassePrazo(reg)}">
-                                            <td><strong>${getStatusPrazo(reg)}</strong></td>
-                                            <td><strong>${reg["Processo - ID"] || "-"}</strong></td>
-                                            <td><strong>${dataVencimento}</strong></td>
-                                            <td>${reg["Responsável"] || "-"}</td>
-                                            <td>${reg["Empresa"] || "-"}</td>
-                                            <td><span class="chip blue white-text">${reg["Tipo"] || "-"}</span></td>
-                                            <td><span class="chip ${obterCorStatus(reg["Status da tarefa"])}">${reg["Status da tarefa"] || "-"}</span></td>
-                                            <td>${obterDescricao(reg)}</td>
-                                        </tr>
-                                    `;
-    }).join("")}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="card-action">
-                        <div class="row">
-                            <div class="col s12 m4">
-                                <span><strong class="red-text">🔴 Atrasados:</strong> ${atrasados.length}</span>
-                            </div>
-                            <div class="col s12 m4">
-                                <span><strong class="orange-text">🟠 Vencem em 7 dias:</strong> ${proximosVencimento.length}</span>
-                            </div>
-                            <div class="col s12 m4">
-                                <span><strong>📊 Total:</strong> ${prazosFatais.length}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    return container;
-}
-
-function gerarRadarResponsaveis(dados, canvasId) {
-    const contagem = {};
-
-    dados.forEach(item => {
-        const nome = item["Responsável"];
-        if (!nome || nome.trim() === "") return;
-        contagem[nome.trim()] = (contagem[nome.trim()] || 0) + 1;
-    });
-
-    const labels = Object.keys(contagem);
-    const valores = Object.values(contagem);
-
-    const ctx = document.getElementById(canvasId).getContext("2d");
-
-    const chart = new Chart(ctx, {
-        type: 'radar',
-        data: {
-            labels,
-            datasets: [{
-                label: "Carga por Responsável",
-                data: valores,
-                backgroundColor: CORES.laranja.fundo,
-                borderColor: CORES.laranja.borda,
-                borderWidth: 2,
-                pointBackgroundColor: "#fff"
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: context => `${context.label}: ${context.formattedValue} processo(s)`
-                    }
-                }
-            },
-            scales: {
-                r: {
-                    beginAtZero: true,
-                    pointLabels: {
-                        font: { size: 12 }
-                    }
-                }
-            }
-        }
-    });
-
-    return chart;
-}
-
-async function adicionarGraficoRadarResponsaveis() {
-    const dados = await carregarExcel();
-    const id = "graficoRadarResponsaveis";
-
-    if (document.getElementById(id)) return;
-
-    const container = document.createElement("div");
-    container.className = "grafico-container";
-    container.innerHTML = `
-        <div class="grafico-header">
-            <strong>📊 Distribuição da Carga por Responsável</strong>
-        </div>
-        <canvas id="${id}" style="max-height: 450px;"></canvas>
-    `;
-
-    document.getElementById("graficos").appendChild(container);
-    gerarRadarResponsaveis(dados, id);
-}
-
-
-// 🆕 Função corrigida para gerar gráfico de pendências com filtro correto
-function gerarGraficoPendenciasStacked(dados, canvasId) {
-    // console.log(`🎯 Gráfico Pendências - Iniciando filtro`);
-
-    const responsaveis = new Set();
-    const areas = new Set();
-    const mapa = {};
-    const registrosPorAreaEResponsavel = {}; // Para armazenar registros para o modal
-
-    // Usa a função filtrarDadosAteHoje para garantir consistência
-    const dadosFiltradosPorData = filtrarDadosAteHoje(dados);
-
-    // Filtra apenas os com status pendente
-    const dadosFiltrados = dadosFiltradosPorData.filter(item => {
-        const status = item["Status da tarefa"];
-        const statusPendente = status && (
-            status.toLowerCase().includes("pendente") ||
-            status.toLowerCase().includes("ativo") ||
-            status.toLowerCase().includes("em andamento") ||
-            status.toLowerCase().includes("a vencer")
-        );
-
-        return statusPendente;
-    });
-
-    // console.log(`📊 Pendências - Total original: ${dados.length}`);
-    // console.log(`📊 Pendências - Filtrado por data: ${dadosFiltradosPorData.length}`);
-    // console.log(`📊 Pendências - Final (data + status): ${dadosFiltrados.length}`);
-
-    dadosFiltrados.forEach(item => {
-        const responsavel = item["Responsável"]?.trim();
-        const area = item["Área do Direito"]?.trim();
-
-        if (responsavel && area) {
-            responsaveis.add(responsavel);
-            areas.add(area);
-
-            if (!mapa[area]) mapa[area] = {};
-            mapa[area][responsavel] = (mapa[area][responsavel] || 0) + 1;
-
-            // Armazena registros para o modal
-            const chave = `${area}_${responsavel}`;
-            if (!registrosPorAreaEResponsavel[chave]) {
-                registrosPorAreaEResponsavel[chave] = [];
-            }
-            registrosPorAreaEResponsavel[chave].push(item);
-        }
-    });
-
-    const responsaveisArray = Array.from(responsaveis).sort();
-    const cores = Object.values(CORES);
-    const areasArray = Array.from(areas);
-
-    const datasets = areasArray.map((area, idx) => ({
-        label: area,
-        data: responsaveisArray.map(responsavel => mapa[area]?.[responsavel] || 0),
-        backgroundColor: cores[idx % cores.length].fundo,
-        borderColor: cores[idx % cores.length].borda,
-        borderWidth: 1
-    }));
-
-    const ctx = document.getElementById(canvasId).getContext("2d");
-
-    const chart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: responsaveisArray,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                tooltip: {
-                    mode: "index",
-                    intersect: false
-                },
-                legend: {
-                    position: "top"
-                }
-            },
-            interaction: {
-                mode: "nearest",
-                axis: "x",
-                intersect: false
-            },
-            scales: {
-                x: {
-                    stacked: true,
-                    title: { display: true, text: 'Responsável' }
-                },
-                y: {
-                    stacked: true,
-                    beginAtZero: true,
-                    title: { display: true, text: 'Quantidade de Pendências (até hoje)' }
-                }
-            },
-            onClick: (e, elements) => {
-                if (elements.length === 0) return;
-
-                const element = elements[0];
-                const datasetIndex = element.datasetIndex;
-                const index = element.index;
-
-                const area = chart.data.datasets[datasetIndex].label;
-                const responsavel = chart.data.labels[index];
-
-                const chave = `${area}_${responsavel}`;
-                const registros = registrosPorAreaEResponsavel[chave] || [];
-
-                if (registros.length > 0) {
-                    exibirTabela(canvasId, registros);
-                }
-            }
-        }
-    });
-
-    return chart;
-}
-
-async function adicionarGraficoPendenciasPorAreaEUsuario() {
-    const dados = await carregarExcel();
-    const id = "graficoPendenciasAreaResponsavel";
-
-    if (document.getElementById(id)) return;
-
-    const container = document.createElement("div");
-    container.className = "grafico-container";
-    container.innerHTML = `
-        <div class="grafico-header">
-            <strong>📌 Pendências por Responsável e Área do Direito (até hoje)</strong>
-        </div>
-        <canvas id="${id}" style="max-height: 500px;"></canvas>
-    `;
-
-    document.getElementById("graficos").appendChild(container);
-    gerarGraficoPendenciasStacked(dados, id);
-}
-
-// 🎨 Função auxiliar para definir cores dos status
-function obterCorStatus(status) {
-    if (!status) return "grey";
-
-    const statusLower = status.toLowerCase();
-
-    if (statusLower.includes("ativo") || statusLower.includes("pendente")) {
-        return "green white-text";
-    } else if (statusLower.includes("concluído") || statusLower.includes("finalizado")) {
-        return "blue white-text";
-    } else if (statusLower.includes("atrasado") || statusLower.includes("vencido")) {
-        return "red white-text";
-    } else if (statusLower.includes("aguardando")) {
-        return "orange white-text";
-    } else {
-        return "grey white-text";
-    }
-}
-
 // 🔍 Função de debug para verificar como as datas estão sendo processadas
 function debugDatas(dados) {
     // console.log("🔍 === DEBUG DE DATAS ===");
@@ -1525,125 +550,6 @@ function debugDatas(dados) {
 }
 
 // Para usar o debug, chame: debugDatas(dadosExcel) no console do navegador
-
-
-
-// 🆕 Função corrigida para atualizar estatísticas
-async function atualizarEstatisticas() {
-    const dados = await carregarExcel();
-
-    // Total de processos
-    document.getElementById('totalProcessos').textContent = dados.length;
-
-    // Total de audiências
-    const audiencias = dados.filter(item => {
-        const tipo = item["Tipo"];
-        return tipo && (
-            tipo.toLowerCase().includes("audiência") ||
-            tipo.toLowerCase().includes("audiencia")
-        );
-    });
-    document.getElementById('totalAudiencias').textContent = audiencias.length;
-
-    // Tarefas pendentes (até hoje) - usando a função filtrarDadosAteHoje
-    const dadosFiltradosPorData = filtrarDadosAteHoje(dados);
-
-    const pendentes = dadosFiltradosPorData.filter(item => {
-        const status = item["Status da tarefa"];
-        const statusPendente = status && (
-            status.toLowerCase().includes("pendente") ||
-            status.toLowerCase().includes("ativo") ||
-            status.toLowerCase().includes("em andamento") ||
-            status.toLowerCase().includes("a vencer")
-        );
-
-        return statusPendente;
-    });
-
-    // console.log(`📊 Estatísticas - Total de dados: ${dados.length}`);
-    // console.log(`📊 Estatísticas - Filtrados por data (até hoje): ${dadosFiltradosPorData.length}`);
-    // console.log(`📊 Estatísticas - Pendentes até hoje: ${pendentes.length}`);
-
-    document.getElementById('totalPendentes').textContent = pendentes.length;
-
-    // Prazos fatais (atrasados ou que vencem em 7 dias)
-    const hoje = new Date();
-    hoje.setHours(23, 59, 59, 999);
-    const seteDiasDepois = new Date(hoje);
-    seteDiasDepois.setDate(hoje.getDate() + 7);
-
-    // Função auxiliar para verificar se um campo indica "Sim" para prazo fatal
-    const temPrazoFatal = (valor) => {
-        if (!valor) return false;
-        const valorLower = valor.toString().toLowerCase().trim();
-        return valorLower === 'sim' ||
-            valorLower === 's' ||
-            valorLower === 'yes' ||
-            valorLower === 'y' ||
-            valorLower === 'true' ||
-            valorLower === '1';
-    };
-
-    // Função auxiliar para converter data pt-BR para objeto Date
-    const converterDataPtBR = (dataStr) => {
-        if (!dataStr || dataStr === "-" || dataStr === "") return null;
-
-        if (typeof dataStr === 'string' && dataStr.includes('/')) {
-            const parteData = dataStr.split(' ')[0];
-            const partes = parteData.split('/');
-
-            if (partes.length === 3) {
-                const dia = parseInt(partes[0]);
-                const mes = parseInt(partes[1]) - 1;
-                const ano = parseInt(partes[2]);
-
-                if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11 && ano >= 2000) {
-                    return new Date(ano, mes, dia);
-                }
-            }
-        }
-
-        return null;
-    };
-
-    const prazosFataisCriticos = dados.filter(item => {
-        // Verifica se tem prazo fatal marcado como "Sim"
-        const campos = [
-            "Solicitação - Há Prazo Fatal",
-            "Há Prazo Fatal",
-            "Prazo Fatal",
-            "Prazo Crítico",
-            "Urgente"
-        ];
-
-        const temPrazo = campos.some(campo => temPrazoFatal(item[campo]));
-        if (!temPrazo) return false;
-
-        // Verifica a data de vencimento
-        const camposData = [
-            "Data do agendamento",
-            "Data de Vencimento",
-            "Data Limite",
-            "Prazo"
-        ];
-
-        let dataVencimento = null;
-
-        for (const campo of camposData) {
-            if (item[campo]) {
-                dataVencimento = converterDataPtBR(item[campo]);
-                if (dataVencimento) break;
-            }
-        }
-
-        if (!dataVencimento) return false;
-
-        // Inclui se está atrasado ou vence nos próximos 7 dias
-        return dataVencimento <= seteDiasDepois;
-    });
-
-    document.getElementById('totalAtrasados').textContent = prazosFataisCriticos.length;
-}
 
 // 🔍 Função de debug para analisar prazos fatais
 function debugPrazosFatais(dados) {
@@ -1743,757 +649,6 @@ function debugPrazosFatais(dados) {
             )
         }
     };
-}
-
-
-// 🆕 Função para filtrar dados dos próximos 7 dias
-function filtrarDadosProximos7Dias(dados) {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0); // Início do dia de hoje
-
-    const seteDiasDepois = new Date(hoje);
-    seteDiasDepois.setDate(hoje.getDate() + 7);
-    seteDiasDepois.setHours(23, 59, 59, 999); // Final do 7º dia
-
-    // console.log(`🔍 Filtrando próximos 7 dias:`);
-    // console.log(`   📅 A partir de: ${hoje.toLocaleDateString('pt-BR')}`);
-    // console.log(`   📅 Até: ${seteDiasDepois.toLocaleDateString('pt-BR')}`);
-
-    const dadosFiltrados = dados.filter(item => {
-        const dataStr = item["Data do agendamento"];
-
-        // Ignora registros sem data ou com data vazia
-        if (!dataStr || dataStr === "" || dataStr === "-") return false;
-
-        let dataAgendamento = null;
-
-        // Como as datas já estão em formato pt-BR (DD/MM/YYYY), processa diretamente
-        if (typeof dataStr === 'string' && dataStr.includes('/')) {
-            // Remove a parte do horário se existir (DD/MM/YYYY HH:MM)
-            const parteData = dataStr.split(' ')[0];
-            const partes = parteData.split('/');
-
-            if (partes.length === 3) {
-                const dia = parseInt(partes[0]);
-                const mes = parseInt(partes[1]) - 1; // Mês em JS é 0-11
-                const ano = parseInt(partes[2]);
-
-                // Validação básica dos valores
-                if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11 && ano >= 2000) {
-                    dataAgendamento = new Date(ano, mes, dia);
-                }
-            }
-        }
-
-        // Se não conseguiu parsear, tenta outros formatos (fallback)
-        if (!dataAgendamento && dataStr) {
-            try {
-                dataAgendamento = new Date(dataStr);
-            } catch (e) {
-                console.warn(`Erro ao parsear data: ${dataStr}`);
-                return false;
-            }
-        }
-
-        // Verifica se a data é válida
-        if (!dataAgendamento || isNaN(dataAgendamento.getTime())) {
-            console.warn(`Data inválida encontrada: "${dataStr}"`);
-            return false;
-        }
-
-        // Verifica se a data está nos próximos 7 dias (depois de hoje e dentro do período)
-        const dataValida = dataAgendamento > hoje && dataAgendamento <= seteDiasDepois;
-
-        return dataValida;
-    });
-
-    // console.log(`📊 Total de registros originais: ${dados.length}`);
-    // console.log(`📊 Registros dos próximos 7 dias: ${dadosFiltrados.length}`);
-
-    // Debug: mostra as 5 primeiras datas filtradas
-    // console.log('✅ Primeiras 5 datas dos próximos 7 dias:');
-    dadosFiltrados.slice(0, 5).forEach((item, i) => {
-        // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
-    });
-
-    return dadosFiltrados;
-}
-
-// 🆕 Função para filtrar todas as atividades futuras
-function filtrarDadosFuturos(dados) {
-    const hoje = new Date();
-    hoje.setHours(23, 59, 59, 999); // Final do dia de hoje
-
-    // console.log(`🔍 Filtrando todas as atividades futuras a partir de: ${hoje.toLocaleDateString('pt-BR')}`);
-
-    const dadosFiltrados = dados.filter(item => {
-        const dataStr = item["Data do agendamento"];
-
-        // Ignora registros sem data ou com data vazia
-        if (!dataStr || dataStr === "" || dataStr === "-") return false;
-
-        let dataAgendamento = null;
-
-        // Como as datas já estão em formato pt-BR (DD/MM/YYYY), processa diretamente
-        if (typeof dataStr === 'string' && dataStr.includes('/')) {
-            // Remove a parte do horário se existir (DD/MM/YYYY HH:MM)
-            const parteData = dataStr.split(' ')[0];
-            const partes = parteData.split('/');
-
-            if (partes.length === 3) {
-                const dia = parseInt(partes[0]);
-                const mes = parseInt(partes[1]) - 1; // Mês em JS é 0-11
-                const ano = parseInt(partes[2]);
-
-                // Validação básica dos valores
-                if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11 && ano >= 2000) {
-                    dataAgendamento = new Date(ano, mes, dia);
-                }
-            }
-        }
-
-        // Se não conseguiu parsear, tenta outros formatos (fallback)
-        if (!dataAgendamento && dataStr) {
-            try {
-                dataAgendamento = new Date(dataStr);
-            } catch (e) {
-                console.warn(`Erro ao parsear data: ${dataStr}`);
-                return false;
-            }
-        }
-
-        // Verifica se a data é válida
-        if (!dataAgendamento || isNaN(dataAgendamento.getTime())) {
-            console.warn(`Data inválida encontrada: "${dataStr}"`);
-            return false;
-        }
-
-        // Verifica se a data é futura (depois de hoje)
-        const dataValida = dataAgendamento > hoje;
-
-        return dataValida;
-    });
-
-    // console.log(`📊 Total de registros originais: ${dados.length}`);
-    // console.log(`📊 Registros futuros: ${dadosFiltrados.length}`);
-
-    // Debug: mostra as 5 primeiras datas filtradas
-    // console.log('✅ Primeiras 5 datas futuras:');
-    dadosFiltrados.slice(0, 5).forEach((item, i) => {
-        // console.log(`  ${i + 1}. "${item["Data do agendamento"]}"`);
-    });
-
-    return dadosFiltrados;
-}
-
-// 🆕 Função modificada para aceitar filtros personalizados
-function gerarGraficoPorColunaComFiltro(coluna, dados, canvasId, cor = CORES.roxo, filtroCallback = null, tituloExtra = "") {
-    // Aplica filtro personalizado se fornecido
-    let dadosFiltrados = dados;
-    if (filtroCallback && typeof filtroCallback === 'function') {
-        dadosFiltrados = filtroCallback(dados);
-        // console.log(`🎯 Gráfico "${coluna}" - Total original: ${dados.length}`);
-        // console.log(`🎯 Gráfico "${coluna}" - Filtrado: ${dadosFiltrados.length} registros`);
-    }
-
-    const contagem = {};
-    dadosFiltrados.forEach(item => {
-        const chave = item[coluna];
-        if (chave && chave.trim() && chave.trim() !== "-") {
-            const chaveLimpa = chave.trim();
-            contagem[chaveLimpa] = (contagem[chaveLimpa] || 0) + 1;
-        }
-    });
-
-    const nomesCompletos = Object.keys(contagem);
-    const valores = Object.values(contagem);
-
-    // Para responsável, mostra apenas o primeiro nome no gráfico
-    const labels = nomesCompletos.map(nome => {
-        return coluna.toLowerCase() === "responsável" ? nome.split(" ")[0] : nome;
-    });
-
-    const ctx = document.getElementById(canvasId).getContext("2d");
-
-    const chart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: `Quantidade por ${coluna}${tituloExtra}`,
-                data: valores,
-                backgroundColor: cor.fundo,
-                borderColor: cor.borda,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            onClick: (e, elements) => {
-                if (elements.length === 0) return;
-
-                const index = elements[0].index;
-                const valorClicado = chart.data.labels[index];
-
-                let resultados;
-
-                if (coluna.toLowerCase() === "responsável") {
-                    // Para responsável, encontra nomes completos que batem com o primeiro nome
-                    const nomesCorrespondentes = nomesCompletos.filter(nome => nome.startsWith(valorClicado));
-                    resultados = dadosFiltrados.filter(item =>
-                        nomesCorrespondentes.includes(item["Responsável"]?.trim())
-                    );
-                } else {
-                    // Para outras colunas, filtra diretamente pelo valor
-                    resultados = dadosFiltrados.filter(item => {
-                        const valorItem = item[coluna]?.trim();
-                        return valorItem === nomesCompletos.find(nome =>
-                            (coluna.toLowerCase() === "responsável" ? nome.split(" ")[0] : nome) === valorClicado
-                        );
-                    });
-                }
-
-                // console.log(`🔍 Clique no gráfico "${coluna}": ${valorClicado} - ${resultados.length} resultados`);
-
-                exibirTabela(canvasId, resultados);
-            },
-            plugins: {
-                datalabels: {
-                    anchor: 'end',
-                    align: 'top',
-                    color: '#000',
-                    font: { weight: 'bold', size: 12 },
-                    formatter: Math.round
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function (context) {
-                            const index = context[0].dataIndex;
-                            // Mostra o nome completo no tooltip
-                            return nomesCompletos[index];
-                        },
-                        label: function (context) {
-                            return `${context.dataset.label}: ${context.parsed.y}`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: `Quantidade${tituloExtra}`
-                    }
-                },
-                x: {
-                    title: { display: true, text: coluna }
-                }
-            }
-        },
-        plugins: [ChartDataLabels]
-    });
-
-    return chart;
-}
-
-// 📅 Função para gerar gráfico de linha do volume de prazos por dia
-function gerarGraficoVolumePrazosDiario(dados, canvasId) {
-    const contagemPorDia = {};
-    const registrosPorDia = {}; // Para armazenar registros para o modal
-
-    // Processa todos os dados com datas válidas
-    dados.forEach(item => {
-        const dataStr = item["Data do agendamento"];
-
-        // Ignora registros sem data ou com data vazia
-        if (!dataStr || dataStr === "" || dataStr === "-") return;
-
-        let dataAgendamento = null;
-
-        // Como as datas já estão em formato pt-BR (DD/MM/YYYY), processa diretamente
-        if (typeof dataStr === 'string' && dataStr.includes('/')) {
-            // Remove a parte do horário se existir (DD/MM/YYYY HH:MM)
-            const parteData = dataStr.split(' ')[0];
-            const partes = parteData.split('/');
-
-            if (partes.length === 3) {
-                const dia = parseInt(partes[0]);
-                const mes = parseInt(partes[1]) - 1; // Mês em JS é 0-11
-                const ano = parseInt(partes[2]);
-
-                // Validação básica dos valores
-                if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11 && ano >= 2000) {
-                    dataAgendamento = new Date(ano, mes, dia);
-                }
-            }
-        }
-
-        // Se não conseguiu parsear, tenta outros formatos (fallback)
-        if (!dataAgendamento && dataStr) {
-            try {
-                dataAgendamento = new Date(dataStr);
-            } catch (e) {
-                console.warn(`Erro ao parsear data: ${dataStr}`);
-                return;
-            }
-        }
-
-        // Verifica se a data é válida
-        if (!dataAgendamento || isNaN(dataAgendamento.getTime())) {
-            console.warn(`Data inválida encontrada: "${dataStr}"`);
-            return;
-        }
-
-        // Cria chave no formato DD/MM/YYYY para agrupamento
-        const chaveData = `${String(dataAgendamento.getDate()).padStart(2, '0')}/${String(dataAgendamento.getMonth() + 1).padStart(2, '0')}/${dataAgendamento.getFullYear()}`;
-        
-        // Conta ocorrências por dia
-        contagemPorDia[chaveData] = (contagemPorDia[chaveData] || 0) + 1;
-
-        // Armazena registros para o modal
-        if (!registrosPorDia[chaveData]) {
-            registrosPorDia[chaveData] = [];
-        }
-        registrosPorDia[chaveData].push(item);
-    });
-
-    // Ordena as datas cronologicamente
-    const datasOrdenadas = Object.keys(contagemPorDia).sort((a, b) => {
-        const [diaA, mesA, anoA] = a.split('/').map(Number);
-        const [diaB, mesB, anoB] = b.split('/').map(Number);
-        const dataA = new Date(anoA, mesA - 1, diaA);
-        const dataB = new Date(anoB, mesB - 1, diaB);
-        return dataA - dataB;
-    });
-
-    const valores = datasOrdenadas.map(data => contagemPorDia[data]);
-
-    // Identifica o dia de hoje para destacar no gráfico
-    const hoje = new Date();
-    const hojeStr = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`;
-
-    // Cria cores diferenciadas: passado (azul), hoje (laranja), futuro (verde)
-    const coresPontos = datasOrdenadas.map(data => {
-        const [dia, mes, ano] = data.split('/').map(Number);
-        const dataAtual = new Date(ano, mes - 1, dia);
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-
-        if (data === hojeStr) {
-            return '#FF9F40'; // Laranja para hoje
-        } else if (dataAtual < hoje) {
-            return '#36A2EB'; // Azul para passado
-        } else {
-            return '#4BC0C0'; // Verde para futuro
-        }
-    });
-
-    const ctx = document.getElementById(canvasId).getContext("2d");
-
-    const chart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: datasOrdenadas,
-            datasets: [{
-                label: "Volume de Prazos por Dia",
-                data: valores,
-                fill: true,
-                borderColor: CORES.azul.borda,
-                backgroundColor: CORES.azul.fundo,
-                tension: 0.3,
-                pointRadius: 4,
-                pointHoverRadius: 8,
-                pointBackgroundColor: coresPontos,
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            onClick: (e, elements) => {
-                if (elements.length === 0) return;
-
-                const index = elements[0].index;
-                const dataClicada = chart.data.labels[index];
-                const registros = registrosPorDia[dataClicada] || [];
-
-                if (registros.length > 0) {
-                    console.log(`🔍 Clique no gráfico de volume diário: ${dataClicada} - ${registros.length} atividades`);
-                    exibirTabela(canvasId, registros);
-                }
-            },
-            plugins: {
-                datalabels: {
-                    display: false // Desabilita labels nos pontos para não poluir
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function(context) {
-                            const data = context[0].label;
-                            const [dia, mes, ano] = data.split('/').map(Number);
-                            const dataObj = new Date(ano, mes - 1, dia);
-                            const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-                            const diaSemana = diasSemana[dataObj.getDay()];
-                            return `${diaSemana}, ${data}`;
-                        },
-                        label: function(context) {
-                            const quantidade = context.parsed.y;
-                            return `${quantidade} ${quantidade === 1 ? 'atividade' : 'atividades'}`;
-                        },
-                        afterLabel: function(context) {
-                            const data = context.label;
-                            const hoje = new Date();
-                            const hojeStr = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`;
-                            
-                            if (data === hojeStr) {
-                                return '📅 Hoje';
-                            }
-                            
-                            const [dia, mes, ano] = data.split('/').map(Number);
-                            const dataAtual = new Date(ano, mes - 1, dia);
-                            hoje.setHours(0, 0, 0, 0);
-                            
-                            if (dataAtual < hoje) {
-                                return '⏪ Passado';
-                            } else {
-                                return '⏩ Futuro';
-                            }
-                        }
-                    }
-                },
-                legend: {
-                    display: true,
-                    position: 'top'
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Número de Atividades'
-                    },
-                    ticks: {
-                        stepSize: 1 // Força números inteiros no eixo Y
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Data (DD/MM/YYYY)'
-                    },
-                    ticks: {
-                        maxTicksLimit: 15, // Limita o número de labels no eixo X
-                        callback: function(value, index) {
-                            // Mostra apenas algumas datas para não poluir o eixo
-                            const totalDatas = this.chart.data.labels.length;
-                            const intervalo = Math.ceil(totalDatas / 10);
-                            return index % intervalo === 0 ? this.chart.data.labels[index] : '';
-                        }
-                    }
-                }
-            },
-            elements: {
-                point: {
-                    hoverRadius: 8
-                }
-            }
-        },
-        plugins: [ChartDataLabels]
-    });
-
-    return chart;
-}
-
-// 📊 Função para adicionar o gráfico de volume diário
-async function adicionarGraficoVolumePrazosDiario() {
-    const dados = await carregarExcel();
-    const id = "graficoVolumePrazosDiario";
-
-    // Remove gráfico anterior se existir
-    const graficoExistente = document.getElementById(id);
-    if (graficoExistente) {
-        graficoExistente.closest('.grafico-container').remove();
-    }
-
-    const container = document.createElement("div");
-    container.className = "grafico-container";
-    container.innerHTML = `
-        <div class="grafico-header">
-            <strong>📈 Volume de Prazos por Dia</strong>
-            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
-                🔵 Passado | 🟠 Hoje | 🟢 Futuro | Clique nos pontos para ver detalhes
-            </div>
-        </div>
-        <canvas id="${id}" style="max-height: 450px;"></canvas>
-    `;
-
-    document.getElementById("graficos").appendChild(container);
-    
-    const chart = gerarGraficoVolumePrazosDiario(dados, id);
-    charts[id] = { chart, coluna: "Volume Diário" };
-
-    // Estatísticas do gráfico
-    const totalDias = Object.keys(chart.data.labels).length;
-    const totalAtividades = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-    const mediaDiaria = (totalAtividades / totalDias).toFixed(1);
-    const maiorVolume = Math.max(...chart.data.datasets[0].data);
-
-    console.log(`📊 Gráfico de Volume Diário criado:`);
-    console.log(`   📅 Total de dias: ${totalDias}`);
-    console.log(`   📋 Total de atividades: ${totalAtividades}`);
-    console.log(`   📊 Média diária: ${mediaDiaria} atividades`);
-    console.log(`   🔥 Maior volume em um dia: ${maiorVolume} atividades`);
-
-    return chart;
-}
-
-// 🚀 Para adicionar o gráfico, chame:
-// adicionarGraficoVolumePrazosDiario();
-
-// 🆕 Função para gerar gráfico dos próximos 7 dias
-async function adicionarGraficoProximos7Dias(coluna) {
-    const dados = await carregarExcel();
-
-    const idUnico = `grafico_7dias_${Math.random().toString(36).substr(2, 9)}`;
-    const container = document.createElement("div");
-    container.className = "grafico-container";
-
-    const hoje = new Date();
-    const seteDiasDepois = new Date(hoje);
-    seteDiasDepois.setDate(hoje.getDate() + 7);
-
-    container.innerHTML = `
-        <div class="grafico-header">
-            <strong>📅 ${coluna} - Próximos 7 Dias (${hoje.toLocaleDateString('pt-BR')} a ${seteDiasDepois.toLocaleDateString('pt-BR')})</strong>
-            <select onchange="trocarCor('${idUnico}', '${coluna}', this.value)">
-                ${Object.keys(CORES).map(cor => `<option value="${cor}">${cor[0].toUpperCase() + cor.slice(1)}</option>`).join('')}
-            </select>
-        </div>
-        <canvas id="${idUnico}"></canvas>
-    `;
-
-    document.getElementById("graficos").appendChild(container);
-    const chart = gerarGraficoPorColunaComFiltro(coluna, dados, idUnico, CORES.verde, filtrarDadosProximos7Dias, " (próximos 7 dias)");
-    charts[idUnico] = { chart, coluna };
-}
-
-// 🆕 Função para gerar gráfico de todas as atividades futuras
-async function adicionarGraficoAtividadesFuturas(coluna) {
-    const dados = await carregarExcel();
-
-    const idUnico = `grafico_futuras_${Math.random().toString(36).substr(2, 9)}`;
-    const container = document.createElement("div");
-    container.className = "grafico-container";
-
-    container.innerHTML = `
-        <div class="grafico-header">
-            <strong>🔮 ${coluna} - Todas as Atividades Futuras</strong>
-            <select onchange="trocarCor('${idUnico}', '${coluna}', this.value)">
-                ${Object.keys(CORES).map(cor => `<option value="${cor}">${cor[0].toUpperCase() + cor.slice(1)}</option>`).join('')}
-            </select>
-        </div>
-        <canvas id="${idUnico}"></canvas>
-    `;
-
-    document.getElementById("graficos").appendChild(container);
-    const chart = gerarGraficoPorColunaComFiltro(coluna, dados, idUnico, CORES.azul, filtrarDadosFuturos, " (futuras)");
-    charts[idUnico] = { chart, coluna };
-}
-
-// 🆕 Função para gerar tabela das próximas atividades (7 dias)
-function gerarTabelaProximasAtividades(dados) {
-    const proximasAtividades = filtrarDadosProximos7Dias(dados);
-
-    // Ordena por data (mais próximas primeiro)
-    proximasAtividades.sort((a, b) => {
-        const dataA = new Date(a["Data do agendamento"].split('/').reverse().join('-'));
-        const dataB = new Date(b["Data do agendamento"].split('/').reverse().join('-'));
-        return dataA - dataB;
-    });
-
-    const hoje = new Date();
-    const seteDiasDepois = new Date(hoje);
-    seteDiasDepois.setDate(hoje.getDate() + 7);
-
-    const container = document.createElement("div");
-    container.className = "row";
-    container.id = "proximas-atividades";
-    container.innerHTML = `
-        <div class="col s12">
-            <div class="card">
-                <div class="card-content">
-                    <span class="card-title green-text">📅 Próximas Atividades (7 dias)</span>
-                    <p class="grey-text">
-                        <strong>Período:</strong> ${hoje.toLocaleDateString('pt-BR')} a ${seteDiasDepois.toLocaleDateString('pt-BR')}
-                    </p>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        <table class="striped highlight responsive-table">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Processo ID</th>
-                                    <th>Responsável</th>
-                                    <th>Empresa</th>
-                                    <th>Tipo</th>
-                                    <th>Status</th>
-                                    <th>Descrição</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${proximasAtividades.map(reg => `
-                                    <tr>
-                                        <td><strong class="green-text">${formatarDataExcel(reg["Data do agendamento"])}</strong></td>
-                                        <td><strong>${reg["Processo - ID"] || "-"}</strong></td>
-                                        <td>${reg["Responsável"] || "-"}</td>
-                                        <td>${reg["Empresa"] || "-"}</td>
-                                        <td><span class="chip blue white-text">${reg["Tipo"] || "-"}</span></td>
-                                        <td><span class="chip ${obterCorStatus(reg["Status da tarefa"])}">${reg["Status da tarefa"] || "-"}</span></td>
-                                        <td>${obterDescricao(reg)}</td>
-                                    </tr>
-                                `).join("")}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="card-action">
-                        <span><strong>Total de atividades nos próximos 7 dias:</strong> ${proximasAtividades.length}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    return container;
-}
-
-// 🆕 Função para gerar tabela de todas as atividades futuras
-function gerarTabelaAtividadesFuturas(dados) {
-    const atividadesFuturas = filtrarDadosFuturos(dados);
-
-    // Ordena por data (mais próximas primeiro)
-    atividadesFuturas.sort((a, b) => {
-        const dataA = new Date(a["Data do agendamento"].split('/').reverse().join('-'));
-        const dataB = new Date(b["Data do agendamento"].split('/').reverse().join('-'));
-        return dataA - dataB;
-    });
-
-    const container = document.createElement("div");
-    container.className = "row";
-    container.id = "atividades-futuras";
-    container.innerHTML = `
-        <div class="col s12">
-            <div class="card">
-                <div class="card-content">
-                    <span class="card-title blue-text">🔮 Todas as Atividades Futuras</span>
-                    <p class="grey-text">
-                        <strong>Critério:</strong> Todas as atividades com data posterior a hoje
-                    </p>
-                    <div style="max-height: 500px; overflow-y: auto;">
-                        <table class="striped highlight responsive-table">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Processo ID</th>
-                                    <th>Responsável</th>
-                                    <th>Empresa</th>
-                                    <th>Área do Direito</th>
-                                    <th>Tipo</th>
-                                    <th>Status</th>
-                                    <th>Descrição</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${atividadesFuturas.map(reg => `
-                                    <tr>
-                                        <td><strong class="blue-text">${formatarDataExcel(reg["Data do agendamento"])}</strong></td>
-                                        <td><strong>${reg["Processo - ID"] || "-"}</strong></td>
-                                        <td>${reg["Responsável"] || "-"}</td>
-                                        <td>${reg["Empresa"] || "-"}</td>
-                                        <td>${reg["Área do Direito"] || "-"}</td>
-                                        <td><span class="chip blue white-text">${reg["Tipo"] || "-"}</span></td>
-                                        <td><span class="chip ${obterCorStatus(reg["Status da tarefa"])}">${reg["Status da tarefa"] || "-"}</span></td>
-                                        <td>${obterDescricao(reg)}</td>
-                                    </tr>
-                                `).join("")}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="card-action">
-                        <span><strong>Total de atividades futuras:</strong> ${atividadesFuturas.length}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    return container;
-}
-
-// 🆕 Função atualizada para incluir as novas tabelas
-async function adicionarTabelasEspeciaisCompletas() {
-    const dados = await carregarExcel();
-
-    const containerPrincipal = document.createElement("div");
-    containerPrincipal.className = "container";
-    containerPrincipal.style.marginTop = "20px";
-
-    const titulo = document.createElement("h4");
-    titulo.textContent = "📊 Relatórios Especiais";
-    titulo.className = "center-align";
-    containerPrincipal.appendChild(titulo);
-
-    const tabelaPrazos = gerarTabelaPrazosFatais(dados);
-    containerPrincipal.appendChild(tabelaPrazos);
-
-    // 🆕 Novas tabelas de atividades futuras
-    const tabelaProximas = gerarTabelaProximasAtividades(dados);
-    containerPrincipal.appendChild(tabelaProximas);
-
-    const tabelaFuturas = gerarTabelaAtividadesFuturas(dados);
-    containerPrincipal.appendChild(tabelaFuturas);
-
-    const wrapRelatorios = document.getElementById("relatoriosEspeciaisWrap");
-    (wrapRelatorios || document.body).appendChild(containerPrincipal);
-}
-
-
-
-
-// Para usar: debugPrazosFatais(dadosExcel) no console do navegador
-
-async function adicionarGraficoEvolucaoMensal() {
-    const dados = await carregarExcel();
-    const id = "graficoEvolucaoMensal";
-
-    if (document.getElementById(id)) return;
-
-    const container = document.createElement("div");
-    container.className = "grafico-container";
-    container.innerHTML = `
-        <div class="grafico-header">
-            <strong>📅 Evolução Mensal de Processos</strong>
-        </div>
-        <canvas id="${id}" style="max-height: 400px;"></canvas>
-    `;
-
-    document.getElementById("graficos").appendChild(container);
-    gerarGraficoEvolucaoMensal(dados, id);
-}
-
-function rolarPara(id) {
-    const elemento = document.getElementById(id);
-    if (elemento) {
-        const details = elemento.closest('details');
-        if (details && !details.open) details.open = true;
-
-        elemento.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
-    } else {
-        console.warn(`Elemento com id '${id}' não encontrado.`);
-    }
 }
 
 // 🆕 Alterna as abas do header (Produtividade / Atividades / Prazos / Audiências)
@@ -2648,15 +803,11 @@ function calcularRankingResponsaveis(dados) {
     return Object.values(porResponsavel).sort((a, b) => b.total - a.total);
 }
 
-// 🚨 Prazos fatais ainda pendentes, agrupados por responsável (com os itens individuais)
-function calcularPrazosFatais(dados) {
-    const pendentesComPrazo = dados.filter(item =>
-        temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"]) &&
-        !statusIndicaConcluida(item["Status da tarefa"])
-    );
-
+// 👥 Agrupa uma lista de itens por Responsável, ordenando cada grupo por data
+// e os grupos por quantidade (usado pelos painéis e pelos modais dos tiles)
+function agruparPorResponsavel(itens) {
     const porResponsavel = {};
-    pendentesComPrazo.forEach(item => {
+    itens.forEach(item => {
         const resp = (item["Responsável"] || "").trim() || "Sem responsável";
         if (!porResponsavel[resp]) porResponsavel[resp] = [];
         porResponsavel[resp].push(item);
@@ -2675,6 +826,63 @@ function calcularPrazosFatais(dados) {
     });
 
     return grupos.sort((a, b) => b.registros.length - a.registros.length);
+}
+
+// 🎨 Monta o HTML de uma lista agrupada por responsável (seções com avatar + tabela),
+// usado tanto no painel "Prazos e Riscos" quanto nos modais dos tiles do topo
+function construirListaAgrupadaPorResponsavel(grupos, cabecalhos, renderizarLinha, rotuloItem = "item(ns)") {
+    if (!grupos.length) {
+        return `<p style="text-align:center; color:var(--ink-faint); padding:1rem 0;">Nenhum item encontrado</p>`;
+    }
+
+    return grupos.map(grupo => {
+        const iniciais = grupo.responsavel.split(" ")
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(p => p[0].toUpperCase())
+            .join("") || "?";
+
+        const linhas = grupo.registros.map(renderizarLinha).join("");
+
+        return `
+            <div class="responsavel-grupo">
+                <div class="responsavel-grupo-header">
+                    <span class="avatar">${iniciais}</span>
+                    <span class="responsavel-grupo-nome">${grupo.responsavel}</span>
+                    <span class="responsavel-grupo-count">${grupo.registros.length} ${rotuloItem}</span>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="ranking-table">
+                        <thead><tr>${cabecalhos.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+                        <tbody>${linhas}</tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+// 🚨 Prazos fatais ainda pendentes, agrupados por responsável (com os itens individuais)
+function calcularPrazosFatais(dados) {
+    const pendentesComPrazo = dados.filter(item =>
+        temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"]) &&
+        !statusIndicaConcluida(item["Status da tarefa"])
+    );
+
+    return agruparPorResponsavel(pendentesComPrazo);
+}
+
+// 🎨 Linha padrão de uma tabela de prazos fatais (Processo ID | Área | Data | Situação)
+function linhaPrazoFatal(item) {
+    const situacao = situacaoPrazoItem(item);
+    return `
+        <tr>
+            <td>${item["Processo - ID"] || "-"}</td>
+            <td>${item["Área do Direito"] || "-"}</td>
+            <td>${formatarDataExcel(item["Data do agendamento"])}</td>
+            <td><span class="pill ${situacao.classe}">${situacao.texto}</span></td>
+        </tr>
+    `;
 }
 
 // 🚨 Situação de vencimento de um item individual de prazo fatal
@@ -2807,53 +1015,97 @@ function renderizarPainelPrazosFataisNovo(dados) {
         meta.textContent = `${totalItens} prazo(s) fatal(is) em aberto no momento do carregamento.`;
     }
 
-    if (!grupos.length) {
-        container.innerHTML = `<p style="text-align:center; color:var(--ink-faint); padding:1rem 0;">Nenhum prazo fatal em aberto</p>`;
-        return;
+    container.innerHTML = construirListaAgrupadaPorResponsavel(
+        grupos,
+        ["Processo ID", "Área", "Data", "Situação"],
+        linhaPrazoFatal,
+        "prazo(s) fatal(is)"
+    );
+}
+
+// ============================================================
+// 🆕 Modal genérico (usado pelos tiles clicáveis do topo)
+// ============================================================
+
+function abrirModal(titulo, corpoHtml) {
+    const overlay = document.getElementById("modalOverlay");
+    const tituloEl = document.getElementById("modalTitulo");
+    const corpoEl = document.getElementById("modalCorpo");
+    if (!overlay || !tituloEl || !corpoEl) return;
+
+    tituloEl.textContent = titulo;
+    corpoEl.innerHTML = corpoHtml;
+    overlay.hidden = false;
+}
+
+function fecharModal() {
+    const overlay = document.getElementById("modalOverlay");
+    if (overlay) overlay.hidden = true;
+}
+
+document.addEventListener("click", (e) => {
+    const overlay = document.getElementById("modalOverlay");
+    if (overlay && !overlay.hidden && e.target === overlay) {
+        fecharModal();
     }
+});
 
-    container.innerHTML = grupos.map(grupo => {
-        const iniciais = grupo.responsavel.split(" ")
-            .filter(Boolean)
-            .slice(0, 2)
-            .map(p => p[0].toUpperCase())
-            .join("") || "?";
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") fecharModal();
+});
 
-        const linhas = grupo.registros.map(item => {
-            const situacao = situacaoPrazoItem(item);
-            return `
-                <tr>
-                    <td>${item["Processo - ID"] || "-"}</td>
-                    <td>${item["Área do Direito"] || "-"}</td>
-                    <td>${formatarDataExcel(item["Data do agendamento"])}</td>
-                    <td><span class="pill ${situacao.classe}">${situacao.texto}</span></td>
-                </tr>
-            `;
-        }).join("");
+// Tarefas ativas cuja "Data do agendamento" cai exatamente em `dia`
+function filtrarAtivasPorDia(dados, dia) {
+    return dados.filter(item => {
+        if (statusIndicaConcluida(item["Status da tarefa"])) return false;
+        const data = parseDataAgendamento(item["Data do agendamento"]);
+        return data && mesmoDia(data, dia);
+    });
+}
 
-        return `
-            <div class="responsavel-grupo">
-                <div class="responsavel-grupo-header">
-                    <span class="avatar">${iniciais}</span>
-                    <span class="responsavel-grupo-nome">${grupo.responsavel}</span>
-                    <span class="responsavel-grupo-count">${grupo.registros.length} prazo(s) fatal(is)</span>
-                </div>
-                <div style="overflow-x:auto;">
-                    <table class="ranking-table">
-                        <thead>
-                            <tr>
-                                <th>Processo ID</th>
-                                <th>Área</th>
-                                <th>Data</th>
-                                <th>Situação</th>
-                            </tr>
-                        </thead>
-                        <tbody>${linhas}</tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-    }).join("");
+// 🎨 Linha padrão de uma tarefa nos modais "Vencem hoje"/"Vencem amanhã"
+function linhaModalTarefa(item) {
+    return `
+        <tr>
+            <td>${item["Processo - ID"] || "-"}</td>
+            <td>${item["Área do Direito"] || "-"}</td>
+            <td>${item["Tipo"] || "-"}</td>
+            <td><span class="pill ${pillClasseStatus(item["Status da tarefa"])}">${item["Status da tarefa"] || "-"}</span></td>
+        </tr>
+    `;
+}
+
+// Abre o modal do tile "Vencem hoje" (offsetDias=0) ou "Vencem amanhã" (offsetDias=1)
+function abrirModalPorDia(offsetDias, titulo) {
+    const dia = new Date();
+    dia.setHours(0, 0, 0, 0);
+    dia.setDate(dia.getDate() + offsetDias);
+
+    const itens = filtrarAtivasPorDia(dadosExcel, dia);
+    const grupos = agruparPorResponsavel(itens);
+    const corpo = construirListaAgrupadaPorResponsavel(
+        grupos,
+        ["Processo ID", "Área", "Tipo", "Status"],
+        linhaModalTarefa,
+        "tarefa(s)"
+    );
+
+    abrirModal(`${titulo} (${itens.length})`, corpo);
+}
+
+// Abre o modal do tile "Prazo fatal em aberto"
+function abrirModalPrazoFatal() {
+    const grupos = calcularPrazosFatais(dadosExcel);
+    const totalItens = grupos.reduce((acc, grupo) => acc + grupo.registros.length, 0);
+
+    const corpo = construirListaAgrupadaPorResponsavel(
+        grupos,
+        ["Processo ID", "Área", "Data", "Situação"],
+        linhaPrazoFatal,
+        "prazo(s) fatal(is)"
+    );
+
+    abrirModal(`Prazo fatal em aberto (${totalItens})`, corpo);
 }
 
 // 🧑‍💼 Lista de responsáveis distintos presentes na planilha (ordenada)
@@ -3134,12 +1386,7 @@ window.onload = async () => {
     try {
         const dados = await carregarExcel();
 
-        // Atualiza estatísticas
-        await atualizarEstatisticas();
-
-        // exibirDataB3();
-
-        exibirUltimaAtualizacao(); // ⬅️ Adicionada aqui
+        exibirUltimaAtualizacao();
 
         // 🆕 Painel de Produtividade da Equipe
         renderizarTilesResumo(dados);
@@ -3153,44 +1400,6 @@ window.onload = async () => {
 
         // 🆕 Aba "Audiências Agendadas"
         renderizarPainelAudiencias(dados);
-
-        // 📊 Gráficos principais com filtro "até hoje"
-        const colunas = ["Responsável", "Área do Direito"];
-        for (const coluna of colunas) {
-            await adicionarGrafico(coluna, true); // true = filtrar até hoje
-        }
-
-        // 📌 Gráfico de pendências por área e responsável
-        await adicionarGraficoPendenciasPorAreaEUsuario();
-
-        // 🍕 Gráfico de pizza
-        await adicionarGraficoPizza();
-
-        // 📈 Gráfico de evolução mensal
-        // await adicionarGraficoEvolucaoMensal();
-
-        // 🧑‍💼 Gráfico radar de responsáveis
-        await adicionarGraficoRadarResponsaveis();
-
-        // 📊 Gráfico de volume de prazos por dia
-        await adicionarGraficoVolumePrazosDiario();
-
-
-        // 🗓️ Gráfico de próximos 7 dias
-        await adicionarGraficoProximos7Dias("Responsável");
-
-        // 📅 Gráfico atividades futuras
-        await adicionarGraficoAtividadesFuturas("Responsável");
-
-        // 📋 Tabelas especiais
-
-        await adicionarTabelasEspeciaisCompletas();
-
-        // Adiciona animações aos elementos
-        document.querySelectorAll('.grafico-container').forEach((el, index) => {
-            el.classList.add('fade-in');
-            el.style.animationDelay = `${index * 0.1}s`;
-        });
 
         // Remove loading overlay
         const loadingOverlay = document.getElementById('loadingOverlay');
@@ -3213,4 +1422,4 @@ window.onload = async () => {
             `;
         }
     }
-};
+};

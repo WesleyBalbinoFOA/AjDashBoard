@@ -1,23 +1,6 @@
 :root {
-  /* Paleta original */
+  /* Usado pelo spinner de carregamento */
   --primary-color: #1976d2;
-  --secondary-color: #424242;
-  --success-color: #4caf50;
-  --warning-color: #ff9800;
-  --error-color: #f44336;
-
-  /* Paleta de alto contraste */
-  --primary-color-contrast: #1565c0;       /* Azul escuro para ícones principais */
-  --secondary-color-contrast: #263238;     /* Cinza grafite para texto e números */
-  --success-color-contrast: #2e7d32;       /* Verde escuro acessível */
-  --warning-color-contrast: #ef6c00;       /* Laranja escuro e vibrante */
-  --error-color-contrast: #c62828;         /* Vermelho escuro para alertas */
-  --info-color: #00838f;                   /* Azul petróleo para neutros ou informativos */
-
-  /* Estética visual */
-  --gradient-bg: linear-gradient(135deg, #dbdbdd 0%, #4b82a2 100%);
-  --card-bg: rgba(255, 255, 255, 0.95);
-  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 
   /* Tokens do redesign (produtividade da equipe) */
   --accent:#0058A3; --accent-ink:#003E76; --accent-soft:#E8F1FB; --accent-soft-2:#DCE9F8;
@@ -484,45 +467,6 @@ body {
   color: var(--ink-faint);
 }
 
-/* ===== Seção "Análises detalhadas" (legado) ===== */
-.legacy-details {
-  margin: 2rem 0;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-
-.legacy-details summary {
-  cursor: pointer;
-  padding: 1rem 1.35rem;
-  font-family: 'Lexend', sans-serif;
-  font-weight: 600;
-  color: var(--ink);
-  list-style: none;
-}
-
-.legacy-details summary::-webkit-details-marker {
-  display: none;
-}
-
-.legacy-details summary::before {
-  content: "▸";
-  display: inline-block;
-  margin-right: 0.5rem;
-  color: var(--accent);
-  transition: transform 0.2s ease;
-}
-
-.legacy-details[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.legacy-details-body {
-  padding: 0.5rem 1.35rem 1.35rem;
-}
-
 .footer-note {
   text-align: center;
   color: var(--ink-faint);
@@ -530,118 +474,79 @@ body {
   padding: 1.5rem 0 2.5rem;
 }
 
-
-.stats-overview {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 3rem;
+/* Tiles clicáveis (abrem modal com a listagem de tarefas) */
+.tile-clickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
-.stat-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 2rem;
-  box-shadow: var(--card-shadow);
-  text-align: center;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-}
-
-/* Efeito hover para cards clicáveis */
-.stat-card[style*="cursor: pointer"]:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
-}
-
-
-.stat-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  display: block;
-}
-
-.stat-icon.blue {
-  color: var(--primary-color-contrast);
-}
-
-.stat-icon.green {
-  color: var(--success-color-contrast);
-}
-
-.stat-icon.orange {
-  color: var(--warning-color-contrast);
-}
-
-.stat-icon.red {
-  color: var(--error-color-contrast);
-}
-
-.stat-number {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--secondary-color);
-  margin: 0;
-  line-height: 1;
-}
-
-.stat-label {
-  font-size: 1rem;
-  color: var(--secondary-color);
-  opacity: 0.7;
-  margin: 0.5rem 0 0 0;
-  font-weight: 500;
-}
-
-.grafico-container {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: var(--card-shadow);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: transform 0.3s ease;
-}
-
-.grafico-container:hover {
+.tile-clickable:hover {
+  border-color: var(--accent);
   transform: translateY(-2px);
 }
 
-.grafico-header {
+/* ===== Modal genérico ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 20, 0.55);
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid #f5f5f5;
+  justify-content: center;
+  z-index: 500;
+  padding: 1rem;
 }
 
-.grafico-header strong {
-  font-size: 1.3rem;
-  color: var(--primary-color);
+.modal-box {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 760px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.modal-title {
+  font-family: 'Lexend', sans-serif;
   font-weight: 600;
+  font-size: 1rem;
+  color: var(--ink);
+  margin: 0;
 }
 
-.grafico-header select {
-  padding: 0.5rem 1rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  background: white;
-  color: var(--secondary-color);
-  font-weight: 500;
-  transition: border-color 0.3s ease;
+.modal-close {
+  border: none;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  flex: 0 0 auto;
 }
 
-.grafico-header select:focus {
-  border-color: var(--primary-color);
-  outline: none;
+.modal-close:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.modal-body {
+  padding: 1.1rem 1.25rem;
+  overflow-y: auto;
 }
 
 .loading-overlay {
@@ -689,25 +594,7 @@ body {
   padding: 0 1rem;
 }
 
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-  gap: 2rem;
-}
-
 @media (max-width: 768px) {
-  .charts-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .grafico-container {
-    padding: 1.5rem;
-  }
-
-  .stat-card {
-    padding: 1.5rem;
-  }
-
   .topbar-inner {
     padding: 0.75rem 1rem;
   }
@@ -732,35 +619,3 @@ body {
   }
 }
 
-/* Animação de entrada */
-.fade-in {
-  opacity: 0;
-  transform: translateY(20px);
-  animation: fadeInUp 0.6s ease forwards;
-}
-
-@keyframes fadeInUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Customização dos cards do Materialize */
-/* Fundo sempre claro (padrão Materialize) — força texto escuro fixo para
-   manter contraste independente do tema light/dark da página. */
-.card {
-  border-radius: 16px;
-  box-shadow: var(--card-shadow);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #263238;
-}
-
-.card .card-title {
-  font-weight: 600;
-}
-
-/* Modal de detalhes (exibirTabela) também mantém fundo claro fixo do Materialize */
-.modal {
-  color: #263238;
-}
