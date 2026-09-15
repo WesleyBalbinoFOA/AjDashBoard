@@ -81,21 +81,18 @@ function exibirUltimaAtualizacao() {
     const raw = localStorage.getItem("ultimaAtualizacaoExcel");
 
     if (!raw) {
-        el.innerHTML = `<i class="material-icons">update</i> <em>Sem dados</em>`;
+        el.innerHTML = `<span class="dot" style="background:var(--ink-faint);"></span><em>Sem dados</em>`;
         return;
     }
 
     try {
-      
         el.innerHTML = `
-        <span title="${raw}">
-            <i class="material-icons">update</i>
-            Atualizado em ${dataB3Formatada}
-        </span>
+        <span class="dot"></span>
+        <span title="${raw}">Pauta atualizada ${dataB3Formatada}</span>
         `;
     } catch (e) {
         console.warn("Erro ao formatar data:", e);
-        el.innerHTML = `<i class="material-icons">error</i> <em>Erro na data</em>`;
+        el.innerHTML = `<span class="dot" style="background:var(--crit);"></span><em>Erro na data</em>`;
     }
 }
 
@@ -2608,6 +2605,12 @@ function temPrazoFatalSim(valor) {
     return valor.toString().trim().toLowerCase() === "sim";
 }
 
+// Lê um token de cor do :root (resolve o tema light/dark atual) para uso no Chart.js,
+// que não entende `var(--x)` diretamente no canvas.
+function cssVar(nome) {
+    return getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+}
+
 // 📊 Resumo da fila para os tiles do topo
 function calcularResumoFila(dados) {
     const hoje = new Date();
@@ -2644,6 +2647,14 @@ function calcularResumoFila(dados) {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 2);
 
+    // Reaproveita o ranking por responsável para os insights de "hoje"/"amanhã"
+    const ranking = calcularRankingResponsaveis(dados);
+    const respComHoje = ranking.filter(r => r.hoje > 0).length;
+    const topAmanha = ranking
+        .filter(r => r.amanha > 0)
+        .sort((a, b) => b.amanha - a.amanha)
+        .slice(0, 2);
+
     return {
         totalAtivas,
         contHoje,
@@ -2652,7 +2663,9 @@ function calcularResumoFila(dados) {
         pctHoje,
         pctAmanha,
         prazoFatalAberto: prazoFatalAberto.length,
-        topResponsaveisPF
+        topResponsaveisPF,
+        respComHoje,
+        topAmanha
     };
 }
 
@@ -2728,7 +2741,9 @@ function renderizarTilesResumo(dados) {
     if (elTotal) elTotal.textContent = resumo.totalAtivas;
 
     const elSub = document.getElementById("tileAtivasSub");
-    if (elSub) elSub.textContent = `${resumo.contAPrazo} a prazo · ${resumo.contHoje} hoje · ${resumo.contAmanha} amanhã`;
+    if (elSub) {
+        elSub.innerHTML = `<span><b>${resumo.contAPrazo}</b> a prazo</span><span><b>${resumo.contHoje}</b> hoje</span><span><b>${resumo.contAmanha}</b> amanhã</span>`;
+    }
 
     const total = resumo.totalAtivas || 1;
     const pctPrazo = Math.round((resumo.contAPrazo / total) * 100);
@@ -2745,12 +2760,27 @@ function renderizarTilesResumo(dados) {
     const elHojeCount = document.getElementById("tileHojeCount");
     if (elHojeCount) elHojeCount.textContent = resumo.contHoje;
     const elHojeBadge = document.getElementById("tileHojeBadge");
-    if (elHojeBadge) elHojeBadge.textContent = `${resumo.pctHoje}%`;
+    if (elHojeBadge) elHojeBadge.textContent = `${resumo.pctHoje}% da fila`;
+    const elHojeResp = document.getElementById("tileHojeResp");
+    if (elHojeResp) {
+        elHojeResp.innerHTML = resumo.respComHoje
+            ? `Concentradas em <b>${resumo.respComHoje}</b> responsável${resumo.respComHoje > 1 ? "eis" : ""}`
+            : "Nenhuma tarefa vence hoje";
+    }
 
     const elAmanhaCount = document.getElementById("tileAmanhaCount");
     if (elAmanhaCount) elAmanhaCount.textContent = resumo.contAmanha;
     const elAmanhaBadge = document.getElementById("tileAmanhaBadge");
-    if (elAmanhaBadge) elAmanhaBadge.textContent = `${resumo.pctAmanha}%`;
+    if (elAmanhaBadge) elAmanhaBadge.textContent = `${resumo.pctAmanha}% da fila`;
+    const elAmanhaResp = document.getElementById("tileAmanhaResp");
+    if (elAmanhaResp) {
+        if (resumo.topAmanha.length) {
+            const nomes = resumo.topAmanha.map(r => `<b>${r.nome.split(" ")[0]}</b>`).join(" e ");
+            elAmanhaResp.innerHTML = `Pico em ${nomes}`;
+        } else {
+            elAmanhaResp.textContent = "Nenhuma tarefa amanhã";
+        }
+    }
 
     const elPrazoFatalCount = document.getElementById("tilePrazoFatalCount");
     if (elPrazoFatalCount) elPrazoFatalCount.textContent = resumo.prazoFatalAberto;
@@ -2758,10 +2788,9 @@ function renderizarTilesResumo(dados) {
     const elPrazoFatalResp = document.getElementById("tilePrazoFatalResp");
     if (elPrazoFatalResp) {
         if (resumo.topResponsaveisPF.length) {
-            const texto = resumo.topResponsaveisPF
-                .map(([nome, qtd]) => `${nome.split(" ")[0]} (${qtd})`)
-                .join(", ");
-            elPrazoFatalResp.textContent = `Concentra: ${texto}`;
+            elPrazoFatalResp.innerHTML = resumo.topResponsaveisPF
+                .map(([nome, qtd]) => `${qtd} com <b>${nome.split(" ")[0]}</b>`)
+                .join(" · ");
         } else {
             elPrazoFatalResp.textContent = "Nenhum prazo fatal em aberto";
         }
@@ -2792,8 +2821,8 @@ function renderizarRankingResponsaveis(dados) {
                         <span>${r.nome}</span>
                     </div>
                 </td>
-                <td class="num">${r.hoje}</td>
-                <td class="num">${r.amanha}</td>
+                <td class="num">${r.hoje || "—"}</td>
+                <td class="num">${r.amanha || "—"}</td>
                 <td class="num">${r.total}</td>
                 <td>
                     <div class="load-bar-track">
@@ -2814,7 +2843,7 @@ function renderizarPainelPrazosFataisNovo(dados) {
     const meta = document.getElementById("prazosFataisMeta");
     if (meta) {
         const totalItens = lista.reduce((acc, item) => acc + item.quantidade, 0);
-        meta.textContent = `${totalItens} prazo(s) fatal(is) em aberto`;
+        meta.textContent = `${totalItens} prazo(s) fatal(is) em aberto no momento do carregamento.`;
     }
 
     if (!lista.length) {
@@ -2823,16 +2852,27 @@ function renderizarPainelPrazosFataisNovo(dados) {
     }
 
     corpo.innerHTML = lista.map(item => {
-        let pill = `<span class="pill neutral">sem vencimento próximo</span>`;
+        let pill = `<span class="pill pill-neutral">sem vencimento próximo</span>`;
         if (item.hoje > 0) {
-            pill = `<span class="pill crit">${item.hoje} vence${item.hoje > 1 ? "m" : ""} hoje</span>`;
+            pill = `<span class="pill pill-crit">${item.hoje} vence${item.hoje > 1 ? "m" : ""} hoje</span>`;
         } else if (item.amanha > 0) {
-            pill = `<span class="pill warn">${item.amanha} vence${item.amanha > 1 ? "m" : ""} amanhã</span>`;
+            pill = `<span class="pill pill-warn">${item.amanha} vence${item.amanha > 1 ? "m" : ""} amanhã</span>`;
         }
+
+        const iniciais = item.responsavel.split(" ")
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(p => p[0].toUpperCase())
+            .join("") || "?";
 
         return `
             <tr>
-                <td>${item.responsavel}</td>
+                <td>
+                    <div class="ranking-row-name">
+                        <span class="avatar">${iniciais}</span>
+                        <span>${item.responsavel}</span>
+                    </div>
+                </td>
                 <td>${item.area}</td>
                 <td class="num">${item.quantidade}</td>
                 <td>${pill}</td>
@@ -2864,6 +2904,10 @@ function gerarGraficoAreaDireito(dados, canvasId) {
         charts[canvasId].chart.destroy();
     }
 
+    const corAccent = cssVar('--accent') || '#0058A3';
+    const corBorda = cssVar('--border') || '#E2E6EC';
+    const corTexto = cssVar('--ink-muted') || '#5B6472';
+
     const ctx = canvas.getContext("2d");
     const chart = new Chart(ctx, {
         type: "bar",
@@ -2872,10 +2916,9 @@ function gerarGraficoAreaDireito(dados, canvasId) {
             datasets: [{
                 label: "Tarefas ativas",
                 data: valores,
-                backgroundColor: "rgba(0, 88, 163, 0.55)",
-                borderColor: "rgba(0, 88, 163, 1)",
-                borderWidth: 1,
-                borderRadius: 4
+                backgroundColor: corAccent,
+                borderRadius: 4,
+                maxBarThickness: 28
             }]
         },
         options: {
@@ -2884,16 +2927,18 @@ function gerarGraficoAreaDireito(dados, canvasId) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                datalabels: {
-                    anchor: 'end',
-                    align: 'right',
-                    color: '#5B6472',
-                    font: { weight: '600', size: 11 }
-                }
+                datalabels: { display: false }
             },
             scales: {
-                x: { beginAtZero: true, ticks: { precision: 0 } },
-                y: { ticks: { autoSkip: false } }
+                x: {
+                    beginAtZero: true,
+                    ticks: { precision: 0, color: corTexto },
+                    grid: { color: corBorda }
+                },
+                y: {
+                    ticks: { autoSkip: false, color: corTexto },
+                    grid: { display: false }
+                }
             }
         },
         plugins: [ChartDataLabels]
@@ -2917,7 +2962,16 @@ function gerarGraficoStatusTarefa(dados, canvasId) {
     const labels = entradas.map(e => e[0]);
     const valores = entradas.map(e => e[1]);
 
-    const coresBarra = ["#0058A3", "#1E8E5A", "#B76E00", "#C4362E", "#5B6472", "#8992A0"];
+    const coresBarra = [
+        cssVar('--accent') || '#0058A3',
+        cssVar('--good') || '#1E8E5A',
+        cssVar('--warn') || '#B76E00',
+        cssVar('--crit') || '#C4362E',
+        cssVar('--ink-muted') || '#5B6472',
+        cssVar('--ink-faint') || '#8992A0'
+    ];
+    const corBorda = cssVar('--border') || '#E2E6EC';
+    const corTexto = cssVar('--ink-muted') || '#5B6472';
 
     const canvas = document.getElementById(canvasId);
     if (!canvas) return null;
@@ -2935,7 +2989,8 @@ function gerarGraficoStatusTarefa(dados, canvasId) {
                 label: "Tarefas",
                 data: valores,
                 backgroundColor: labels.map((_, i) => coresBarra[i % coresBarra.length]),
-                borderRadius: 4
+                borderRadius: 4,
+                maxBarThickness: 40
             }]
         },
         options: {
@@ -2943,15 +2998,18 @@ function gerarGraficoStatusTarefa(dados, canvasId) {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                datalabels: {
-                    anchor: 'end',
-                    align: 'top',
-                    color: '#5B6472',
-                    font: { weight: '600', size: 11 }
-                }
+                datalabels: { display: false }
             },
             scales: {
-                y: { beginAtZero: true, ticks: { precision: 0 } }
+                x: {
+                    ticks: { color: corTexto },
+                    grid: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { precision: 0, color: corTexto },
+                    grid: { color: corBorda }
+                }
             }
         },
         plugins: [ChartDataLabels]

@@ -46,73 +46,82 @@
       <p class="brand-subtitle">Fundação Oswaldo Aranha</p>
     </div>
 
-    <div class="topbar-tabs" role="tablist">
-      <button type="button" class="topbar-tab active" role="tab" aria-selected="true">Produtividade da equipe</button>
-      <button type="button" class="topbar-tab" role="tab" disabled title="Em breve">Minhas atividades</button>
-      <button type="button" class="topbar-tab" role="tab" disabled title="Em breve">Prazos &amp; riscos</button>
+    <div class="topbar-tabs">
+      <span class="topbar-tab active">Produtividade da equipe</span>
+      <span class="topbar-tab">Minhas atividades</span>
+      <span class="topbar-tab">Prazos &amp; riscos</span>
     </div>
 
     <div id="infoAtualizacao" class="topbar-updated">
-      <i class="material-icons">update</i> <span>Carregando...</span>
+      <span class="dot"></span><span>Carregando...</span>
     </div>
   </div>
 </header>
   <div class="container">
 
     <!-- Tiles de resumo -->
+    <div class="section-label">Visão geral da fila</div>
     <div class="tiles-grid" id="tilesResumo">
       <div class="tile">
         <div class="tile-top">
-          <p class="tile-label">Tarefas ativas</p>
+          <div>
+            <p class="tile-label">Tarefas ativas</p>
+            <h3 class="tile-value" id="tileAtivasTotal">-</h3>
+          </div>
         </div>
-        <h3 class="tile-value" id="tileAtivasTotal">-</h3>
-        <p class="tile-sub" id="tileAtivasSub">-</p>
-        <div class="tile-minibar">
+        <div class="tile-breakdown" id="tileAtivasSub">-</div>
+        <div class="tile-bar">
           <span class="seg-prazo" id="segPrazo" style="width:0%"></span>
           <span class="seg-hoje" id="segHoje" style="width:0%"></span>
           <span class="seg-amanha" id="segAmanha" style="width:0%"></span>
         </div>
-        <div class="tile-legend">
-          <span><i style="background:var(--accent)"></i>A prazo</span>
-          <span><i style="background:var(--warn)"></i>Hoje</span>
-          <span><i style="background:var(--good)"></i>Amanhã</span>
-        </div>
       </div>
 
       <div class="tile">
         <div class="tile-top">
-          <p class="tile-label">Vencem hoje</p>
-          <span class="tile-badge warn" id="tileHojeBadge">0%</span>
+          <div>
+            <p class="tile-label">Vencem hoje</p>
+            <h3 class="tile-value" id="tileHojeCount" style="color:var(--warn);">-</h3>
+          </div>
+          <span class="tile-badge pill-warn" id="tileHojeBadge">0% da fila</span>
         </div>
-        <h3 class="tile-value" id="tileHojeCount">-</h3>
-        <p class="tile-sub">da fila ativa</p>
+        <div class="tile-breakdown" id="tileHojeResp">-</div>
+        <div class="tile-bar"><span class="seg-hoje" style="width:100%"></span></div>
       </div>
 
       <div class="tile">
         <div class="tile-top">
-          <p class="tile-label">Vencem amanhã</p>
-          <span class="tile-badge good" id="tileAmanhaBadge">0%</span>
+          <div>
+            <p class="tile-label">Vencem amanhã</p>
+            <h3 class="tile-value" id="tileAmanhaCount">-</h3>
+          </div>
+          <span class="tile-badge pill-neutral" id="tileAmanhaBadge">0% da fila</span>
         </div>
-        <h3 class="tile-value" id="tileAmanhaCount">-</h3>
-        <p class="tile-sub">da fila ativa</p>
+        <div class="tile-breakdown" id="tileAmanhaResp">-</div>
+        <div class="tile-bar"><span class="seg-amanha" style="width:100%"></span></div>
       </div>
 
       <div class="tile">
         <div class="tile-top">
-          <p class="tile-label">Prazo fatal em aberto</p>
-          <span class="tile-badge crit">requer atenção</span>
+          <div>
+            <p class="tile-label">Prazo fatal em aberto</p>
+            <h3 class="tile-value" id="tilePrazoFatalCount" style="color:var(--crit);">-</h3>
+          </div>
+          <span class="tile-badge pill-crit">requer atenção</span>
         </div>
-        <h3 class="tile-value" id="tilePrazoFatalCount">-</h3>
-        <p class="tile-sub" id="tilePrazoFatalResp">-</p>
+        <div class="tile-breakdown" id="tilePrazoFatalResp">-</div>
+        <div class="tile-bar"><span class="seg-crit" style="width:100%"></span></div>
       </div>
     </div>
 
     <!-- Painéis principais -->
-    <div class="panels-grid">
-      <div class="panel panel-full">
+    <section class="grid-2">
+      <div class="panel">
         <div class="panel-header">
-          <h4 class="panel-title">Tarefas por responsável</h4>
-          <span class="panel-meta">ordenado por total</span>
+          <div>
+            <h4 class="panel-title">Tarefas por responsável</h4>
+            <p class="panel-sub">Carga atual da fila, ordenado por total de tarefas ativas</p>
+          </div>
         </div>
         <div style="overflow-x:auto;">
           <table class="ranking-table" id="tabelaRanking">
@@ -132,22 +141,22 @@
 
       <div class="panel">
         <div class="panel-header">
-          <h4 class="panel-title">Área do direito</h4>
+          <div>
+            <h4 class="panel-title">Área do direito</h4>
+            <p class="panel-sub">Distribuição das tarefas ativas</p>
+          </div>
         </div>
         <div class="chart-box"><canvas id="graficoAreaDireito"></canvas></div>
       </div>
+    </section>
 
+    <section class="grid-2b">
       <div class="panel">
         <div class="panel-header">
-          <h4 class="panel-title">Status da tarefa</h4>
-        </div>
-        <div class="chart-box"><canvas id="graficoStatusTarefa"></canvas></div>
-      </div>
-
-      <div class="panel panel-full">
-        <div class="panel-header">
-          <h4 class="panel-title">Prazos com risco fatal</h4>
-          <span class="panel-meta" id="prazosFataisMeta">-</span>
+          <div>
+            <h4 class="panel-title">Prazos com risco fatal</h4>
+            <p class="panel-sub">Solicitação - Há Prazo Fatal = "Sim"</p>
+          </div>
         </div>
         <div style="overflow-x:auto;">
           <table class="ranking-table" id="tabelaPrazosFataisNova">
@@ -155,15 +164,26 @@
               <tr>
                 <th>Responsável</th>
                 <th>Área</th>
-                <th>Quantidade</th>
+                <th>Qtd.</th>
                 <th>Situação</th>
               </tr>
             </thead>
             <tbody id="tabelaPrazosFataisNovaBody"></tbody>
           </table>
         </div>
+        <p class="foot-note">Fonte: coluna "Solicitação - Há Prazo Fatal" cruzada com "Data do agendamento" e "Status da tarefa". <span id="prazosFataisMeta">-</span></p>
       </div>
-    </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h4 class="panel-title">Status da tarefa</h4>
+            <p class="panel-sub">Distribuição das tarefas por status</p>
+          </div>
+        </div>
+        <div class="chart-box short"><canvas id="graficoStatusTarefa"></canvas></div>
+      </div>
+    </section>
 
     <!-- Análises detalhadas (dashboard anterior, preservado) -->
     <details class="legacy-details" id="analisesDetalhadas">
