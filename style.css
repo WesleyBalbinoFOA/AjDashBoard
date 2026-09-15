@@ -49,6 +49,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 
 body {
   font-family: 'Inter', sans-serif;
@@ -120,10 +124,18 @@ body {
   gap: 0.25rem;
   margin-left: 0.5rem;
   flex: 1 1 auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.topbar-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .topbar-tab {
+  flex: 0 0 auto;
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
   font-size: 0.86rem;
@@ -134,12 +146,22 @@ body {
   border: none;
   background: transparent;
   font-family: 'Inter', sans-serif;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.topbar-tab:hover {
+  background: var(--surface-sunken);
 }
 
 .topbar-tab.active {
   background: var(--accent-soft);
   color: var(--accent-ink);
   font-weight: 600;
+}
+
+.topbar-tab.active:hover {
+  background: var(--accent-soft);
 }
 
 .topbar-updated {
@@ -169,6 +191,11 @@ body {
   text-transform: uppercase;
   color: var(--ink-faint);
   margin-bottom: 0.6rem;
+}
+
+/* Espaçamento vertical entre os blocos de cada aba (tiles, grids, painéis...) */
+.tab-panel > * + * {
+  margin-top: 1.5rem;
 }
 
 /* ===== Tiles de resumo ===== */
@@ -296,6 +323,28 @@ body {
   font-size: 0.75rem;
   color: var(--ink-faint);
   margin: 0.15rem 0 0;
+}
+
+.responsavel-select {
+  /* Materialize esconde <select> nativos (display:none) para trocar por um
+     dropdown próprio via JS; como não inicializamos esse componente aqui,
+     forçamos a exibição do select nativo, que já é responsivo por padrão. */
+  display: inline-block !important;
+  flex: 0 0 auto;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  min-width: 200px;
+  max-width: 100%;
+}
+
+.responsavel-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .chart-box {

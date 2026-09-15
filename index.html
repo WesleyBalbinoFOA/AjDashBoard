@@ -46,10 +46,11 @@
       <p class="brand-subtitle">Fundação Oswaldo Aranha</p>
     </div>
 
-    <div class="topbar-tabs">
-      <span class="topbar-tab active">Produtividade da equipe</span>
-      <span class="topbar-tab">Minhas atividades</span>
-      <span class="topbar-tab">Prazos &amp; riscos</span>
+    <div class="topbar-tabs" id="topbarTabs">
+      <button type="button" class="topbar-tab active" data-aba="produtividade" onclick="ativarAba('produtividade')">Produtividade da equipe</button>
+      <button type="button" class="topbar-tab" data-aba="atividades" onclick="ativarAba('atividades')">Atividades por Responsável</button>
+      <button type="button" class="topbar-tab" data-aba="prazos" onclick="ativarAba('prazos')">Prazos e Riscos</button>
+      <button type="button" class="topbar-tab" data-aba="audiencias" onclick="ativarAba('audiencias')">Audiências Agendadas</button>
     </div>
 
     <div id="infoAtualizacao" class="topbar-updated">
@@ -58,6 +59,9 @@
   </div>
 </header>
   <div class="container">
+
+  <!-- ===== Aba: Produtividade da equipe ===== -->
+  <section class="tab-panel" data-aba="produtividade">
 
     <!-- Tiles de resumo -->
     <div class="section-label">Visão geral da fila</div>
@@ -150,40 +154,15 @@
       </div>
     </section>
 
-    <section class="grid-2b">
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h4 class="panel-title">Prazos com risco fatal</h4>
-            <p class="panel-sub">Solicitação - Há Prazo Fatal = "Sim"</p>
-          </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h4 class="panel-title">Status da tarefa</h4>
+          <p class="panel-sub">Distribuição das tarefas por status</p>
         </div>
-        <div style="overflow-x:auto;">
-          <table class="ranking-table" id="tabelaPrazosFataisNova">
-            <thead>
-              <tr>
-                <th>Responsável</th>
-                <th>Área</th>
-                <th>Qtd.</th>
-                <th>Situação</th>
-              </tr>
-            </thead>
-            <tbody id="tabelaPrazosFataisNovaBody"></tbody>
-          </table>
-        </div>
-        <p class="foot-note">Fonte: coluna "Solicitação - Há Prazo Fatal" cruzada com "Data do agendamento" e "Status da tarefa". <span id="prazosFataisMeta">-</span></p>
       </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h4 class="panel-title">Status da tarefa</h4>
-            <p class="panel-sub">Distribuição das tarefas por status</p>
-          </div>
-        </div>
-        <div class="chart-box short"><canvas id="graficoStatusTarefa"></canvas></div>
-      </div>
-    </section>
+      <div class="chart-box short"><canvas id="graficoStatusTarefa"></canvas></div>
+    </div>
 
     <!-- Análises detalhadas (dashboard anterior, preservado) -->
     <details class="legacy-details" id="analisesDetalhadas">
@@ -196,7 +175,7 @@
             <p class="stat-label">Total de Processos</p>
           </div>
 
-          <div class="stat-card fade-in" onclick="rolarPara('audiencias')" style="cursor: pointer;">
+          <div class="stat-card fade-in" onclick="ativarAba('audiencias')" style="cursor: pointer;">
             <i class="material-icons stat-icon green">event_available</i>
             <h3 class="stat-number" id="totalAudiencias">-</h3>
             <p class="stat-label">Audiências Agendadas</p>
@@ -208,7 +187,7 @@
             <p class="stat-label">Tarefas Pendentes</p>
           </div>
 
-          <div class="stat-card fade-in" onclick="rolarPara('prazos-fatais')" style="cursor: pointer;">
+          <div class="stat-card fade-in" onclick="ativarAba('prazos')" style="cursor: pointer;">
             <i class="material-icons stat-icon red">warning</i>
             <h3 class="stat-number" id="totalAtrasados">-</h3>
             <p class="stat-label">Prazos de Atenção</p>
@@ -221,7 +200,73 @@
       </div>
     </details>
 
+    <div id="relatoriosEspeciaisWrap"></div>
+
     <p class="footer-note">Dados extraídos da Pauta Diária (Excel) carregada no navegador nesta sessão.</p>
+  </section>
+
+  <!-- ===== Aba: Atividades por Responsável ===== -->
+  <section class="tab-panel" data-aba="atividades" hidden>
+    <div class="section-label">Atividades por responsável</div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h4 class="panel-title">Prazos e tarefas por pessoa</h4>
+          <p class="panel-sub" id="tabelaAtividadesResponsavelMeta">Selecione um responsável para ver os prazos dele(a)</p>
+        </div>
+        <select id="selectResponsavelAtividades" class="responsavel-select"></select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="ranking-table" id="tabelaAtividadesResponsavel">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Processo ID</th>
+              <th>Tipo</th>
+              <th>Status</th>
+              <th>Prazo Fatal</th>
+              <th>Descrição</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaAtividadesResponsavelBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Aba: Prazos e Riscos ===== -->
+  <section class="tab-panel" data-aba="prazos" hidden>
+    <div class="section-label">Prazos e riscos</div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h4 class="panel-title">Prazos com risco fatal</h4>
+          <p class="panel-sub">Solicitação - Há Prazo Fatal = "Sim"</p>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="ranking-table" id="tabelaPrazosFataisNova">
+          <thead>
+            <tr>
+              <th>Responsável</th>
+              <th>Área</th>
+              <th>Qtd.</th>
+              <th>Situação</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaPrazosFataisNovaBody"></tbody>
+        </table>
+      </div>
+      <p class="foot-note">Fonte: coluna "Solicitação - Há Prazo Fatal" cruzada com "Data do agendamento" e "Status da tarefa". <span id="prazosFataisMeta">-</span></p>
+    </div>
+  </section>
+
+  <!-- ===== Aba: Audiências Agendadas ===== -->
+  <section class="tab-panel" data-aba="audiencias" hidden>
+    <div class="section-label">Audiências agendadas</div>
+    <div id="audienciasTabWrap"></div>
+  </section>
+
   </div>
 
   <!-- Materialize JS -->

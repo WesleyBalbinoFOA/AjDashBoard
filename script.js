@@ -2495,6 +2495,12 @@ function gerarTabelaAtividadesFuturas(dados) {
 async function adicionarTabelasEspeciaisCompletas() {
     const dados = await carregarExcel();
 
+    // 🆕 Audiências Agendadas agora vive na própria aba do header
+    const wrapAudiencias = document.getElementById("audienciasTabWrap");
+    if (wrapAudiencias) {
+        wrapAudiencias.appendChild(gerarTabelaAudiencias(dados));
+    }
+
     const containerPrincipal = document.createElement("div");
     containerPrincipal.className = "container";
     containerPrincipal.style.marginTop = "20px";
@@ -2503,10 +2509,6 @@ async function adicionarTabelasEspeciaisCompletas() {
     titulo.textContent = "📊 Relatórios Especiais";
     titulo.className = "center-align";
     containerPrincipal.appendChild(titulo);
-
-    // Tabelas existentes
-    const tabelaAudiencias = gerarTabelaAudiencias(dados);
-    containerPrincipal.appendChild(tabelaAudiencias);
 
     const tabelaPrazos = gerarTabelaPrazosFatais(dados);
     containerPrincipal.appendChild(tabelaPrazos);
@@ -2518,7 +2520,8 @@ async function adicionarTabelasEspeciaisCompletas() {
     const tabelaFuturas = gerarTabelaAtividadesFuturas(dados);
     containerPrincipal.appendChild(tabelaFuturas);
 
-    document.body.appendChild(containerPrincipal);
+    const wrapRelatorios = document.getElementById("relatoriosEspeciaisWrap");
+    (wrapRelatorios || document.body).appendChild(containerPrincipal);
 }
 
 
@@ -2558,6 +2561,19 @@ function rolarPara(id) {
     } else {
         console.warn(`Elemento com id '${id}' não encontrado.`);
     }
+}
+
+// 🆕 Alterna as abas do header (Produtividade / Atividades / Prazos / Audiências)
+function ativarAba(nome) {
+    document.querySelectorAll('.topbar-tab').forEach(botao => {
+        botao.classList.toggle('active', botao.dataset.aba === nome);
+    });
+
+    document.querySelectorAll('.tab-panel').forEach(secao => {
+        secao.hidden = secao.dataset.aba !== nome;
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ============================================================
@@ -2881,6 +2897,75 @@ function renderizarPainelPrazosFataisNovo(dados) {
     }).join("");
 }
 
+// 🧑‍💼 Lista de responsáveis distintos presentes na planilha (ordenada)
+function obterListaResponsaveis(dados) {
+    const nomes = new Set();
+    dados.forEach(item => {
+        const nome = (item["Responsável"] || "").trim();
+        if (nome) nomes.add(nome);
+    });
+    return Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+// 🎨 Preenche o <select> da aba "Atividades por Responsável" e renderiza a primeira opção
+function popularSelectResponsaveis(dados) {
+    const select = document.getElementById("selectResponsavelAtividades");
+    if (!select) return;
+
+    const nomes = obterListaResponsaveis(dados);
+    select.innerHTML = nomes.map(nome => `<option value="${nome}">${nome}</option>`).join("");
+
+    select.onchange = () => renderizarAtividadesPorResponsavel(dados, select.value);
+
+    if (nomes.length) {
+        select.value = nomes[0];
+        renderizarAtividadesPorResponsavel(dados, nomes[0]);
+    }
+}
+
+// 🎨 Renderiza a tabela de prazos/tarefas do responsável selecionado
+function renderizarAtividadesPorResponsavel(dados, nome) {
+    const corpo = document.getElementById("tabelaAtividadesResponsavelBody");
+    if (!corpo) return;
+
+    const atividades = dados
+        .filter(item => (item["Responsável"] || "").trim() === nome)
+        .slice()
+        .sort((a, b) => {
+            const dataA = parseDataAgendamento(a["Data do agendamento"]);
+            const dataB = parseDataAgendamento(b["Data do agendamento"]);
+            if (!dataA && !dataB) return 0;
+            if (!dataA) return 1;
+            if (!dataB) return -1;
+            return dataA - dataB;
+        });
+
+    const meta = document.getElementById("tabelaAtividadesResponsavelMeta");
+    if (meta) meta.textContent = `${atividades.length} tarefa(s) de ${nome}`;
+
+    if (!atividades.length) {
+        corpo.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--ink-faint);">Nenhuma atividade encontrada para este responsável</td></tr>`;
+        return;
+    }
+
+    corpo.innerHTML = atividades.map(item => {
+        const prazoFatal = temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"])
+            ? `<span class="pill pill-crit">Sim</span>`
+            : `<span class="pill pill-neutral">Não</span>`;
+
+        return `
+            <tr>
+                <td>${formatarDataExcel(item["Data do agendamento"])}</td>
+                <td>${item["Processo - ID"] || "-"}</td>
+                <td>${item["Tipo"] || "-"}</td>
+                <td>${item["Status da tarefa"] || "-"}</td>
+                <td>${prazoFatal}</td>
+                <td>${obterDescricao(item)}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
 // 📊 Gráfico de barras horizontal: tarefas ativas por Área do Direito
 function gerarGraficoAreaDireito(dados, canvasId) {
     const ativas = dados.filter(item => !statusIndicaConcluida(item["Status da tarefa"]));
@@ -3037,6 +3122,9 @@ window.onload = async () => {
         renderizarPainelPrazosFataisNovo(dados);
         gerarGraficoAreaDireito(dados, "graficoAreaDireito");
         gerarGraficoStatusTarefa(dados, "graficoStatusTarefa");
+
+        // 🆕 Aba "Atividades por Responsável"
+        popularSelectResponsaveis(dados);
 
         // 📊 Gráficos principais com filtro "até hoje"
         const colunas = ["Responsável", "Área do Direito"];
