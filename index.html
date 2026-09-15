@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
 
@@ -37,66 +37,191 @@
     </div>
   </div>
 
-<!-- Header -->
-<div class="dashboard-header">
-  <div class="container header-container">
-
-    <!-- Logo -->
-    <div class="header-logo" id="logo">
-      <img src="https://www.foa.org.br/wp-content/uploads/2024/02/logo-foa-250px.png" alt="Logo FOA">
+<!-- Topbar -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand-mark" id="logo" title="Recarregar dashboard">FOA</div>
+    <div class="brand-text">
+      <p class="brand-title">Assessoria Jurídica</p>
+      <p class="brand-subtitle">Fundação Oswaldo Aranha</p>
     </div>
 
-    <!-- Títulos -->
-    <div class="header-title-group">
-      <h1 class="dashboard-title">Dashboard Assessoria Jurídica</h1>
-      <h4 class="header-subtitle-1">Fundação Oswaldo Aranha</h4>
-      <h5 class="header-subtitle-2">Assessoria Jurídica – Controladoria Jurídica</h5>
-      <p class="header-subtitle-3">Análise de Processos e Tarefas</p>
+    <div class="topbar-tabs">
+      <span class="topbar-tab active">Produtividade da equipe</span>
+      <span class="topbar-tab">Minhas atividades</span>
+      <span class="topbar-tab">Prazos &amp; riscos</span>
     </div>
 
-    <!-- Espaço vazio -->
-    <div class="">
+    <div id="infoAtualizacao" class="topbar-updated">
+      <span class="dot"></span><span>Carregando...</span>
     </div>
-    
   </div>
-  <div id="infoAtualizacao" class="info-atualizacao"></div>
-</div>
-
-
-
-
+</header>
   <div class="container">
-    <!-- Stats Overview -->
-    <div class="stats-overview">
-      <div class="stat-card fade-in">
-        <i class="material-icons stat-icon blue">assignment</i>
-        <h3 class="stat-number" id="totalProcessos">-</h3>
-        <p class="stat-label">Total de Processos</p>
+
+    <!-- Tiles de resumo -->
+    <div class="section-label">Visão geral da fila</div>
+    <div class="tiles-grid" id="tilesResumo">
+      <div class="tile">
+        <div class="tile-top">
+          <div>
+            <p class="tile-label">Tarefas ativas</p>
+            <h3 class="tile-value" id="tileAtivasTotal">-</h3>
+          </div>
+        </div>
+        <div class="tile-breakdown" id="tileAtivasSub">-</div>
+        <div class="tile-bar">
+          <span class="seg-prazo" id="segPrazo" style="width:0%"></span>
+          <span class="seg-hoje" id="segHoje" style="width:0%"></span>
+          <span class="seg-amanha" id="segAmanha" style="width:0%"></span>
+        </div>
       </div>
 
-      <div class="stat-card fade-in" onclick="rolarPara('audiencias')" style="cursor: pointer;">
-        <i class="material-icons stat-icon green">event_available</i>
-        <h3 class="stat-number" id="totalAudiencias">-</h3>
-        <p class="stat-label">Audiências Agendadas</p>
+      <div class="tile">
+        <div class="tile-top">
+          <div>
+            <p class="tile-label">Vencem hoje</p>
+            <h3 class="tile-value" id="tileHojeCount" style="color:var(--warn);">-</h3>
+          </div>
+          <span class="tile-badge pill-warn" id="tileHojeBadge">0% da fila</span>
+        </div>
+        <div class="tile-breakdown" id="tileHojeResp">-</div>
+        <div class="tile-bar"><span class="seg-hoje" style="width:100%"></span></div>
       </div>
 
-      <div class="stat-card fade-in">
-        <i class="material-icons-outlined stat-icon orange">pending_actions</i>
-        <h3 class="stat-number" id="totalPendentes">-</h3>
-        <p class="stat-label">Tarefas Pendentes</p>
+      <div class="tile">
+        <div class="tile-top">
+          <div>
+            <p class="tile-label">Vencem amanhã</p>
+            <h3 class="tile-value" id="tileAmanhaCount">-</h3>
+          </div>
+          <span class="tile-badge pill-neutral" id="tileAmanhaBadge">0% da fila</span>
+        </div>
+        <div class="tile-breakdown" id="tileAmanhaResp">-</div>
+        <div class="tile-bar"><span class="seg-amanha" style="width:100%"></span></div>
       </div>
 
-      <div class="stat-card fade-in" onclick="rolarPara('prazos-fatais')" style="cursor: pointer;">
-        <i class="material-icons stat-icon red">warning</i>
-        <h3 class="stat-number" id="totalAtrasados">-</h3>
-        <p class="stat-label">Prazos de Atenção</p>
+      <div class="tile">
+        <div class="tile-top">
+          <div>
+            <p class="tile-label">Prazo fatal em aberto</p>
+            <h3 class="tile-value" id="tilePrazoFatalCount" style="color:var(--crit);">-</h3>
+          </div>
+          <span class="tile-badge pill-crit">requer atenção</span>
+        </div>
+        <div class="tile-breakdown" id="tilePrazoFatalResp">-</div>
+        <div class="tile-bar"><span class="seg-crit" style="width:100%"></span></div>
       </div>
     </div>
 
-    <!-- Charts Section -->
-    <div class="charts-grid">
-      <div id="graficos"></div>
-    </div>
+    <!-- Painéis principais -->
+    <section class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h4 class="panel-title">Tarefas por responsável</h4>
+            <p class="panel-sub">Carga atual da fila, ordenado por total de tarefas ativas</p>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="ranking-table" id="tabelaRanking">
+            <thead>
+              <tr>
+                <th>Responsável</th>
+                <th>Hoje</th>
+                <th>Amanhã</th>
+                <th>Total</th>
+                <th>Carga</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaRankingBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h4 class="panel-title">Área do direito</h4>
+            <p class="panel-sub">Distribuição das tarefas ativas</p>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="graficoAreaDireito"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid-2b">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h4 class="panel-title">Prazos com risco fatal</h4>
+            <p class="panel-sub">Solicitação - Há Prazo Fatal = "Sim"</p>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="ranking-table" id="tabelaPrazosFataisNova">
+            <thead>
+              <tr>
+                <th>Responsável</th>
+                <th>Área</th>
+                <th>Qtd.</th>
+                <th>Situação</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaPrazosFataisNovaBody"></tbody>
+          </table>
+        </div>
+        <p class="foot-note">Fonte: coluna "Solicitação - Há Prazo Fatal" cruzada com "Data do agendamento" e "Status da tarefa". <span id="prazosFataisMeta">-</span></p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h4 class="panel-title">Status da tarefa</h4>
+            <p class="panel-sub">Distribuição das tarefas por status</p>
+          </div>
+        </div>
+        <div class="chart-box short"><canvas id="graficoStatusTarefa"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Análises detalhadas (dashboard anterior, preservado) -->
+    <details class="legacy-details" id="analisesDetalhadas">
+      <summary>Análises detalhadas</summary>
+      <div class="legacy-details-body">
+        <div class="stats-overview">
+          <div class="stat-card fade-in">
+            <i class="material-icons stat-icon blue">assignment</i>
+            <h3 class="stat-number" id="totalProcessos">-</h3>
+            <p class="stat-label">Total de Processos</p>
+          </div>
+
+          <div class="stat-card fade-in" onclick="rolarPara('audiencias')" style="cursor: pointer;">
+            <i class="material-icons stat-icon green">event_available</i>
+            <h3 class="stat-number" id="totalAudiencias">-</h3>
+            <p class="stat-label">Audiências Agendadas</p>
+          </div>
+
+          <div class="stat-card fade-in">
+            <i class="material-icons-outlined stat-icon orange">pending_actions</i>
+            <h3 class="stat-number" id="totalPendentes">-</h3>
+            <p class="stat-label">Tarefas Pendentes</p>
+          </div>
+
+          <div class="stat-card fade-in" onclick="rolarPara('prazos-fatais')" style="cursor: pointer;">
+            <i class="material-icons stat-icon red">warning</i>
+            <h3 class="stat-number" id="totalAtrasados">-</h3>
+            <p class="stat-label">Prazos de Atenção</p>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div id="graficos"></div>
+        </div>
+      </div>
+    </details>
+
+    <p class="footer-note">Dados extraídos da Pauta Diária (Excel) carregada no navegador nesta sessão.</p>
   </div>
 
   <!-- Materialize JS -->
