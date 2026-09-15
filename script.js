@@ -965,67 +965,6 @@ async function adicionarGraficoPizza() {
     charts[idUnico] = { chart, coluna: "Status da tarefa" };
 }
 
-function gerarTabelaAudiencias(dados) {
-    const audiencias = dados.filter(item => {
-        const tipo = item["Tipo"];
-        return tipo && (
-            tipo.toLowerCase().includes("audiência") ||
-            tipo.toLowerCase().includes("audiencia") ||
-            tipo.toLowerCase().includes("hearing")
-        );
-    });
-
-    audiencias.sort((a, b) => {
-        const dataA = new Date(a["Data do agendamento"]);
-        const dataB = new Date(b["Data do agendamento"]);
-        return dataA - dataB;
-    });
-
-    const container = document.createElement("div");
-    container.className = "row";
-    container.id = "audiencias";
-    container.innerHTML = `
-        <div class="col s12">
-            <div class="card">
-                <div class="card-content">
-                    <span class="card-title">📅 Audiências Agendadas</span>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        <table class="striped highlight responsive-table">
-                            <thead>
-                                <tr>
-                                    <th>Processo ID</th>
-                                    <th>Data do Agendamento</th>
-                                    <th>Empresa</th>
-                                    <th>Responsável</th>
-                                    <th>Tipo</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${audiencias.map(reg => `
-                                    <tr>
-                                        <td><strong>${reg["Processo - ID"] || "-"}</strong></td>
-                                        <td><strong>${formatarDataExcel(reg["Data do agendamento"])}</strong></td>
-                                        <td>${reg["Empresa"] || "-"}</td>
-                                        <td>${reg["Responsável"] || "-"}</td>
-                                        <td><span class="chip blue white-text">${reg["Tipo"] || "-"}</span></td>
-                                        <td><span class="chip ${obterCorStatus(reg["Status da tarefa"])}">${reg["Status da tarefa"] || "-"}</span></td>
-                                    </tr>
-                                `).join("")}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="card-action">
-                        <span><strong>Total de audiências:</strong> ${audiencias.length}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    return container;
-}
-
 function gerarTabelaPrazosFatais(dados) {
     const hoje = new Date();
     hoje.setHours(23, 59, 59, 999); // Final do dia de hoje
@@ -2495,12 +2434,6 @@ function gerarTabelaAtividadesFuturas(dados) {
 async function adicionarTabelasEspeciaisCompletas() {
     const dados = await carregarExcel();
 
-    // 🆕 Audiências Agendadas agora vive na própria aba do header
-    const wrapAudiencias = document.getElementById("audienciasTabWrap");
-    if (wrapAudiencias) {
-        wrapAudiencias.appendChild(gerarTabelaAudiencias(dados));
-    }
-
     const containerPrincipal = document.createElement("div");
     containerPrincipal.className = "container";
     containerPrincipal.style.marginTop = "20px";
@@ -2715,38 +2648,50 @@ function calcularRankingResponsaveis(dados) {
     return Object.values(porResponsavel).sort((a, b) => b.total - a.total);
 }
 
-// 🚨 Prazos fatais ainda pendentes, agrupados por responsável + área
+// 🚨 Prazos fatais ainda pendentes, agrupados por responsável (com os itens individuais)
 function calcularPrazosFatais(dados) {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const amanha = new Date(hoje);
-    amanha.setDate(hoje.getDate() + 1);
-
     const pendentesComPrazo = dados.filter(item =>
         temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"]) &&
         !statusIndicaConcluida(item["Status da tarefa"])
     );
 
-    const grupos = {};
+    const porResponsavel = {};
     pendentesComPrazo.forEach(item => {
         const resp = (item["Responsável"] || "").trim() || "Sem responsável";
-        const area = (item["Área do Direito"] || "").trim() || "Não informada";
-        const chave = `${resp}||${area}`;
-
-        if (!grupos[chave]) {
-            grupos[chave] = { responsavel: resp, area, quantidade: 0, hoje: 0, amanha: 0 };
-        }
-        grupos[chave].quantidade++;
-
-        const data = parseDataAgendamento(item["Data do agendamento"]);
-        if (data && mesmoDia(data, hoje)) {
-            grupos[chave].hoje++;
-        } else if (data && mesmoDia(data, amanha)) {
-            grupos[chave].amanha++;
-        }
+        if (!porResponsavel[resp]) porResponsavel[resp] = [];
+        porResponsavel[resp].push(item);
     });
 
-    return Object.values(grupos).sort((a, b) => b.quantidade - a.quantidade);
+    const grupos = Object.entries(porResponsavel).map(([responsavel, registros]) => {
+        const ordenados = registros.slice().sort((a, b) => {
+            const dataA = parseDataAgendamento(a["Data do agendamento"]);
+            const dataB = parseDataAgendamento(b["Data do agendamento"]);
+            if (!dataA && !dataB) return 0;
+            if (!dataA) return 1;
+            if (!dataB) return -1;
+            return dataA - dataB;
+        });
+        return { responsavel, registros: ordenados };
+    });
+
+    return grupos.sort((a, b) => b.registros.length - a.registros.length);
+}
+
+// 🚨 Situação de vencimento de um item individual de prazo fatal
+function situacaoPrazoItem(item) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const data = parseDataAgendamento(item["Data do agendamento"]);
+    if (!data) return { texto: "Sem data", classe: "pill-neutral" };
+
+    const diffDias = Math.round((data - hoje) / 86400000);
+
+    if (diffDias < 0) return { texto: `${Math.abs(diffDias)} dia(s) atrasado`, classe: "pill-crit" };
+    if (diffDias === 0) return { texto: "Vence hoje", classe: "pill-crit" };
+    if (diffDias === 1) return { texto: "Vence amanhã", classe: "pill-warn" };
+    if (diffDias <= 7) return { texto: `Vence em ${diffDias} dias`, classe: "pill-warn" };
+    return { texto: `Vence em ${diffDias} dias`, classe: "pill-neutral" };
 }
 
 // 🎨 Renderiza os tiles de resumo do topo
@@ -2850,49 +2795,63 @@ function renderizarRankingResponsaveis(dados) {
     }).join("");
 }
 
-// 🎨 Renderiza a tabela de prazos com risco fatal
+// 🎨 Renderiza os prazos com risco fatal em seções por responsável, listando cada item individualmente
 function renderizarPainelPrazosFataisNovo(dados) {
-    const lista = calcularPrazosFatais(dados);
-    const corpo = document.getElementById("tabelaPrazosFataisNovaBody");
-    if (!corpo) return;
+    const grupos = calcularPrazosFatais(dados);
+    const container = document.getElementById("prazosFataisPorResponsavel");
+    if (!container) return;
 
     const meta = document.getElementById("prazosFataisMeta");
     if (meta) {
-        const totalItens = lista.reduce((acc, item) => acc + item.quantidade, 0);
+        const totalItens = grupos.reduce((acc, grupo) => acc + grupo.registros.length, 0);
         meta.textContent = `${totalItens} prazo(s) fatal(is) em aberto no momento do carregamento.`;
     }
 
-    if (!lista.length) {
-        corpo.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--ink-faint);">Nenhum prazo fatal em aberto</td></tr>`;
+    if (!grupos.length) {
+        container.innerHTML = `<p style="text-align:center; color:var(--ink-faint); padding:1rem 0;">Nenhum prazo fatal em aberto</p>`;
         return;
     }
 
-    corpo.innerHTML = lista.map(item => {
-        let pill = `<span class="pill pill-neutral">sem vencimento próximo</span>`;
-        if (item.hoje > 0) {
-            pill = `<span class="pill pill-crit">${item.hoje} vence${item.hoje > 1 ? "m" : ""} hoje</span>`;
-        } else if (item.amanha > 0) {
-            pill = `<span class="pill pill-warn">${item.amanha} vence${item.amanha > 1 ? "m" : ""} amanhã</span>`;
-        }
-
-        const iniciais = item.responsavel.split(" ")
+    container.innerHTML = grupos.map(grupo => {
+        const iniciais = grupo.responsavel.split(" ")
             .filter(Boolean)
             .slice(0, 2)
             .map(p => p[0].toUpperCase())
             .join("") || "?";
 
+        const linhas = grupo.registros.map(item => {
+            const situacao = situacaoPrazoItem(item);
+            return `
+                <tr>
+                    <td>${item["Processo - ID"] || "-"}</td>
+                    <td>${item["Área do Direito"] || "-"}</td>
+                    <td>${formatarDataExcel(item["Data do agendamento"])}</td>
+                    <td><span class="pill ${situacao.classe}">${situacao.texto}</span></td>
+                </tr>
+            `;
+        }).join("");
+
         return `
-            <tr>
-                <td>
-                    <div class="ranking-row-name">
-                        <span class="avatar">${iniciais}</span>
-                        <span>${item.responsavel}</span>
-                    </div>
-                </td>
-                <td>${item.area}</td>
-                <td class="num">${item.quantidade}</td>
-                <td>${pill}</td>
-            </tr>
+            <div class="responsavel-grupo">
+                <div class="responsavel-grupo-header">
+                    <span class="avatar">${iniciais}</span>
+                    <span class="responsavel-grupo-nome">${grupo.responsavel}</span>
+                    <span class="responsavel-grupo-count">${grupo.registros.length} prazo(s) fatal(is)</span>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="ranking-table">
+                        <thead>
+                            <tr>
+                                <th>Processo ID</th>
+                                <th>Área</th>
+                                <th>Data</th>
+                                <th>Situação</th>
+                            </tr>
+                        </thead>
+                        <tbody>${linhas}</tbody>
+                    </table>
+                </div>
+            </div>
         `;
     }).join("");
 }
@@ -2961,6 +2920,72 @@ function renderizarAtividadesPorResponsavel(dados, nome) {
                 <td>${item["Status da tarefa"] || "-"}</td>
                 <td>${prazoFatal}</td>
                 <td>${obterDescricao(item)}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+// 🎨 Classe de pill correspondente ao status de uma tarefa
+function pillClasseStatus(status) {
+    if (!status) return "pill-neutral";
+    const s = status.toLowerCase();
+
+    if (s.includes("atras") || s.includes("venc")) return "pill-crit";
+    if (s.includes("aguard")) return "pill-warn";
+    if (s.includes("ativo") || s.includes("pendente")) return "pill-good";
+    return "pill-neutral"; // concluído, em andamento, etc.
+}
+
+// 🎨 Renderiza a tabela de audiências agendadas (padrão visual dos novos painéis)
+function renderizarPainelAudiencias(dados) {
+    const corpo = document.getElementById("tabelaAudienciasBody");
+    if (!corpo) return;
+
+    const audiencias = dados
+        .filter(item => {
+            const tipo = item["Tipo"];
+            return tipo && (
+                tipo.toLowerCase().includes("audiência") ||
+                tipo.toLowerCase().includes("audiencia") ||
+                tipo.toLowerCase().includes("hearing")
+            );
+        })
+        .slice()
+        .sort((a, b) => {
+            const dataA = parseDataAgendamento(a["Data do agendamento"]);
+            const dataB = parseDataAgendamento(b["Data do agendamento"]);
+            if (!dataA && !dataB) return 0;
+            if (!dataA) return 1;
+            if (!dataB) return -1;
+            return dataA - dataB;
+        });
+
+    const meta = document.getElementById("audienciasMeta");
+    if (meta) meta.textContent = `${audiencias.length} audiência(s) agendada(s)`;
+
+    if (!audiencias.length) {
+        corpo.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--ink-faint);">Nenhuma audiência agendada</td></tr>`;
+        return;
+    }
+
+    corpo.innerHTML = audiencias.map(item => {
+        const nome = (item["Responsável"] || "").trim() || "-";
+        const iniciais = nome !== "-"
+            ? nome.split(" ").filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join("") || "?"
+            : "?";
+
+        return `
+            <tr>
+                <td>${formatarDataExcel(item["Data do agendamento"])}</td>
+                <td>${item["Processo - ID"] || "-"}</td>
+                <td>${item["Empresa"] || "-"}</td>
+                <td>
+                    <div class="ranking-row-name">
+                        <span class="avatar">${iniciais}</span>
+                        <span>${nome}</span>
+                    </div>
+                </td>
+                <td><span class="pill ${pillClasseStatus(item["Status da tarefa"])}">${item["Status da tarefa"] || "-"}</span></td>
             </tr>
         `;
     }).join("");
@@ -3125,6 +3150,9 @@ window.onload = async () => {
 
         // 🆕 Aba "Atividades por Responsável"
         popularSelectResponsaveis(dados);
+
+        // 🆕 Aba "Audiências Agendadas"
+        renderizarPainelAudiencias(dados);
 
         // 📊 Gráficos principais com filtro "até hoje"
         const colunas = ["Responsável", "Área do Direito"];

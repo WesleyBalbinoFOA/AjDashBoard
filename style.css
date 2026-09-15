@@ -459,6 +459,31 @@ body {
   color: var(--ink-muted);
 }
 
+/* ===== Seções por responsável (ex.: Prazos com risco fatal) ===== */
+.responsavel-grupo + .responsavel-grupo {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.responsavel-grupo-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.responsavel-grupo-nome {
+  font-weight: 600;
+  color: var(--ink);
+  flex: 1 1 auto;
+}
+
+.responsavel-grupo-count {
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
 /* ===== Seção "Análises detalhadas" (legado) ===== */
 .legacy-details {
   margin: 2rem 0;
