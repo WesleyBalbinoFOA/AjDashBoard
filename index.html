@@ -241,22 +241,10 @@
       <div class="panel-header">
         <div>
           <h4 class="panel-title">Prazos com risco fatal</h4>
-          <p class="panel-sub">Solicitação - Há Prazo Fatal = "Sim"</p>
+          <p class="panel-sub">Solicitação - Há Prazo Fatal = "Sim", agrupado por responsável</p>
         </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="ranking-table" id="tabelaPrazosFataisNova">
-          <thead>
-            <tr>
-              <th>Responsável</th>
-              <th>Área</th>
-              <th>Qtd.</th>
-              <th>Situação</th>
-            </tr>
-          </thead>
-          <tbody id="tabelaPrazosFataisNovaBody"></tbody>
-        </table>
-      </div>
+      <div id="prazosFataisPorResponsavel"></div>
       <p class="foot-note">Fonte: coluna "Solicitação - Há Prazo Fatal" cruzada com "Data do agendamento" e "Status da tarefa". <span id="prazosFataisMeta">-</span></p>
     </div>
   </section>
@@ -264,7 +252,28 @@
   <!-- ===== Aba: Audiências Agendadas ===== -->
   <section class="tab-panel" data-aba="audiencias" hidden>
     <div class="section-label">Audiências agendadas</div>
-    <div id="audienciasTabWrap"></div>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h4 class="panel-title">Audiências agendadas</h4>
+          <p class="panel-sub" id="audienciasMeta">Carregando...</p>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="ranking-table" id="tabelaAudiencias">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Processo ID</th>
+              <th>Empresa</th>
+              <th>Responsável</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaAudienciasBody"></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
   </div>
