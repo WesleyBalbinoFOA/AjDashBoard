@@ -2551,6 +2551,9 @@ async function adicionarGraficoEvolucaoMensal() {
 function rolarPara(id) {
     const elemento = document.getElementById(id);
     if (elemento) {
+        const details = elemento.closest('details');
+        if (details && !details.open) details.open = true;
+
         elemento.scrollIntoView({
             behavior: "smooth",
             block: "start"
@@ -2560,18 +2563,422 @@ function rolarPara(id) {
     }
 }
 
+// ============================================================
+// 🆕 Painel de Produtividade da Equipe (redesign)
+// ============================================================
+
+// Considera "ativa" toda tarefa cujo status não indique conclusão/cancelamento
+function statusIndicaConcluida(status) {
+    if (!status) return false;
+    const s = status.toString().toLowerCase();
+    return s.includes("concluíd") || s.includes("concluid") ||
+        s.includes("finalizad") || s.includes("cancelad");
+}
+
+// Converte "Data do agendamento" (pt-BR, DD/MM/YYYY) em Date, sem hora
+function parseDataAgendamento(dataStr) {
+    if (!dataStr || dataStr === "-" || dataStr === "") return null;
+
+    if (typeof dataStr === 'string' && dataStr.includes('/')) {
+        const parteData = dataStr.split(' ')[0];
+        const partes = parteData.split('/');
+
+        if (partes.length === 3) {
+            const dia = parseInt(partes[0]);
+            const mes = parseInt(partes[1]) - 1;
+            const ano = parseInt(partes[2]);
+
+            if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11 && ano >= 2000) {
+                return new Date(ano, mes, dia);
+            }
+        }
+    }
+
+    return null;
+}
+
+function mesmoDia(a, b) {
+    return a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+}
+
+function temPrazoFatalSim(valor) {
+    if (!valor) return false;
+    return valor.toString().trim().toLowerCase() === "sim";
+}
+
+// 📊 Resumo da fila para os tiles do topo
+function calcularResumoFila(dados) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const amanha = new Date(hoje);
+    amanha.setDate(hoje.getDate() + 1);
+
+    const ativas = dados.filter(item => !statusIndicaConcluida(item["Status da tarefa"]));
+
+    let contHoje = 0, contAmanha = 0, contAPrazo = 0;
+    ativas.forEach(item => {
+        const data = parseDataAgendamento(item["Data do agendamento"]);
+        if (data && mesmoDia(data, hoje)) {
+            contHoje++;
+        } else if (data && mesmoDia(data, amanha)) {
+            contAmanha++;
+        } else {
+            contAPrazo++;
+        }
+    });
+
+    const totalAtivas = ativas.length;
+    const pctHoje = totalAtivas ? Math.round((contHoje / totalAtivas) * 100) : 0;
+    const pctAmanha = totalAtivas ? Math.round((contAmanha / totalAtivas) * 100) : 0;
+
+    const prazoFatalAberto = ativas.filter(item => temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"]));
+
+    const porResponsavelPF = {};
+    prazoFatalAberto.forEach(item => {
+        const resp = (item["Responsável"] || "").trim() || "Sem responsável";
+        porResponsavelPF[resp] = (porResponsavelPF[resp] || 0) + 1;
+    });
+    const topResponsaveisPF = Object.entries(porResponsavelPF)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2);
+
+    return {
+        totalAtivas,
+        contHoje,
+        contAmanha,
+        contAPrazo,
+        pctHoje,
+        pctAmanha,
+        prazoFatalAberto: prazoFatalAberto.length,
+        topResponsaveisPF
+    };
+}
+
+// 🧑‍💼 Ranking de tarefas ativas por responsável
+function calcularRankingResponsaveis(dados) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const amanha = new Date(hoje);
+    amanha.setDate(hoje.getDate() + 1);
+
+    const ativas = dados.filter(item => !statusIndicaConcluida(item["Status da tarefa"]));
+
+    const porResponsavel = {};
+    ativas.forEach(item => {
+        const resp = (item["Responsável"] || "").trim();
+        if (!resp) return;
+
+        if (!porResponsavel[resp]) {
+            porResponsavel[resp] = { nome: resp, hoje: 0, amanha: 0, total: 0 };
+        }
+        porResponsavel[resp].total++;
+
+        const data = parseDataAgendamento(item["Data do agendamento"]);
+        if (data && mesmoDia(data, hoje)) {
+            porResponsavel[resp].hoje++;
+        } else if (data && mesmoDia(data, amanha)) {
+            porResponsavel[resp].amanha++;
+        }
+    });
+
+    return Object.values(porResponsavel).sort((a, b) => b.total - a.total);
+}
+
+// 🚨 Prazos fatais ainda pendentes, agrupados por responsável + área
+function calcularPrazosFatais(dados) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const amanha = new Date(hoje);
+    amanha.setDate(hoje.getDate() + 1);
+
+    const pendentesComPrazo = dados.filter(item =>
+        temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"]) &&
+        !statusIndicaConcluida(item["Status da tarefa"])
+    );
+
+    const grupos = {};
+    pendentesComPrazo.forEach(item => {
+        const resp = (item["Responsável"] || "").trim() || "Sem responsável";
+        const area = (item["Área do Direito"] || "").trim() || "Não informada";
+        const chave = `${resp}||${area}`;
+
+        if (!grupos[chave]) {
+            grupos[chave] = { responsavel: resp, area, quantidade: 0, hoje: 0, amanha: 0 };
+        }
+        grupos[chave].quantidade++;
+
+        const data = parseDataAgendamento(item["Data do agendamento"]);
+        if (data && mesmoDia(data, hoje)) {
+            grupos[chave].hoje++;
+        } else if (data && mesmoDia(data, amanha)) {
+            grupos[chave].amanha++;
+        }
+    });
+
+    return Object.values(grupos).sort((a, b) => b.quantidade - a.quantidade);
+}
+
+// 🎨 Renderiza os tiles de resumo do topo
+function renderizarTilesResumo(dados) {
+    const resumo = calcularResumoFila(dados);
+
+    const elTotal = document.getElementById("tileAtivasTotal");
+    if (elTotal) elTotal.textContent = resumo.totalAtivas;
+
+    const elSub = document.getElementById("tileAtivasSub");
+    if (elSub) elSub.textContent = `${resumo.contAPrazo} a prazo · ${resumo.contHoje} hoje · ${resumo.contAmanha} amanhã`;
+
+    const total = resumo.totalAtivas || 1;
+    const pctPrazo = Math.round((resumo.contAPrazo / total) * 100);
+    const pctHojeBarra = Math.round((resumo.contHoje / total) * 100);
+    const pctAmanhaBarra = Math.max(0, 100 - pctPrazo - pctHojeBarra);
+
+    const segPrazo = document.getElementById("segPrazo");
+    const segHoje = document.getElementById("segHoje");
+    const segAmanha = document.getElementById("segAmanha");
+    if (segPrazo) segPrazo.style.width = `${pctPrazo}%`;
+    if (segHoje) segHoje.style.width = `${pctHojeBarra}%`;
+    if (segAmanha) segAmanha.style.width = `${pctAmanhaBarra}%`;
+
+    const elHojeCount = document.getElementById("tileHojeCount");
+    if (elHojeCount) elHojeCount.textContent = resumo.contHoje;
+    const elHojeBadge = document.getElementById("tileHojeBadge");
+    if (elHojeBadge) elHojeBadge.textContent = `${resumo.pctHoje}%`;
+
+    const elAmanhaCount = document.getElementById("tileAmanhaCount");
+    if (elAmanhaCount) elAmanhaCount.textContent = resumo.contAmanha;
+    const elAmanhaBadge = document.getElementById("tileAmanhaBadge");
+    if (elAmanhaBadge) elAmanhaBadge.textContent = `${resumo.pctAmanha}%`;
+
+    const elPrazoFatalCount = document.getElementById("tilePrazoFatalCount");
+    if (elPrazoFatalCount) elPrazoFatalCount.textContent = resumo.prazoFatalAberto;
+
+    const elPrazoFatalResp = document.getElementById("tilePrazoFatalResp");
+    if (elPrazoFatalResp) {
+        if (resumo.topResponsaveisPF.length) {
+            const texto = resumo.topResponsaveisPF
+                .map(([nome, qtd]) => `${nome.split(" ")[0]} (${qtd})`)
+                .join(", ");
+            elPrazoFatalResp.textContent = `Concentra: ${texto}`;
+        } else {
+            elPrazoFatalResp.textContent = "Nenhum prazo fatal em aberto";
+        }
+    }
+}
+
+// 🎨 Renderiza a tabela de ranking de tarefas por responsável
+function renderizarRankingResponsaveis(dados) {
+    const ranking = calcularRankingResponsaveis(dados);
+    const corpo = document.getElementById("tabelaRankingBody");
+    if (!corpo) return;
+
+    const maiorTotal = ranking.reduce((max, r) => Math.max(max, r.total), 0) || 1;
+
+    corpo.innerHTML = ranking.map(r => {
+        const iniciais = r.nome.split(" ")
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(p => p[0].toUpperCase())
+            .join("") || "?";
+        const largura = Math.round((r.total / maiorTotal) * 100);
+
+        return `
+            <tr>
+                <td>
+                    <div class="ranking-row-name">
+                        <span class="avatar">${iniciais}</span>
+                        <span>${r.nome}</span>
+                    </div>
+                </td>
+                <td class="num">${r.hoje}</td>
+                <td class="num">${r.amanha}</td>
+                <td class="num">${r.total}</td>
+                <td>
+                    <div class="load-bar-track">
+                        <div class="load-bar-fill" style="width:${largura}%"></div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+// 🎨 Renderiza a tabela de prazos com risco fatal
+function renderizarPainelPrazosFataisNovo(dados) {
+    const lista = calcularPrazosFatais(dados);
+    const corpo = document.getElementById("tabelaPrazosFataisNovaBody");
+    if (!corpo) return;
+
+    const meta = document.getElementById("prazosFataisMeta");
+    if (meta) {
+        const totalItens = lista.reduce((acc, item) => acc + item.quantidade, 0);
+        meta.textContent = `${totalItens} prazo(s) fatal(is) em aberto`;
+    }
+
+    if (!lista.length) {
+        corpo.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--ink-faint);">Nenhum prazo fatal em aberto</td></tr>`;
+        return;
+    }
+
+    corpo.innerHTML = lista.map(item => {
+        let pill = `<span class="pill neutral">sem vencimento próximo</span>`;
+        if (item.hoje > 0) {
+            pill = `<span class="pill crit">${item.hoje} vence${item.hoje > 1 ? "m" : ""} hoje</span>`;
+        } else if (item.amanha > 0) {
+            pill = `<span class="pill warn">${item.amanha} vence${item.amanha > 1 ? "m" : ""} amanhã</span>`;
+        }
+
+        return `
+            <tr>
+                <td>${item.responsavel}</td>
+                <td>${item.area}</td>
+                <td class="num">${item.quantidade}</td>
+                <td>${pill}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+// 📊 Gráfico de barras horizontal: tarefas ativas por Área do Direito
+function gerarGraficoAreaDireito(dados, canvasId) {
+    const ativas = dados.filter(item => !statusIndicaConcluida(item["Status da tarefa"]));
+
+    const contagem = {};
+    ativas.forEach(item => {
+        const area = (item["Área do Direito"] || "").trim();
+        if (area && area !== "-") {
+            contagem[area] = (contagem[area] || 0) + 1;
+        }
+    });
+
+    const entradas = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+    const labels = entradas.map(e => e[0]);
+    const valores = entradas.map(e => e[1]);
+
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+
+    if (charts[canvasId]) {
+        charts[canvasId].chart.destroy();
+    }
+
+    const ctx = canvas.getContext("2d");
+    const chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{
+                label: "Tarefas ativas",
+                data: valores,
+                backgroundColor: "rgba(0, 88, 163, 0.55)",
+                borderColor: "rgba(0, 88, 163, 1)",
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'right',
+                    color: '#5B6472',
+                    font: { weight: '600', size: 11 }
+                }
+            },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 } },
+                y: { ticks: { autoSkip: false } }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+
+    charts[canvasId] = { chart, coluna: "Área do Direito" };
+    return chart;
+}
+
+// 📊 Gráfico de barras: contagem por Status da tarefa
+function gerarGraficoStatusTarefa(dados, canvasId) {
+    const contagem = {};
+    dados.forEach(item => {
+        const status = (item["Status da tarefa"] || "").trim();
+        if (status && status !== "-") {
+            contagem[status] = (contagem[status] || 0) + 1;
+        }
+    });
+
+    const entradas = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+    const labels = entradas.map(e => e[0]);
+    const valores = entradas.map(e => e[1]);
+
+    const coresBarra = ["#0058A3", "#1E8E5A", "#B76E00", "#C4362E", "#5B6472", "#8992A0"];
+
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+
+    if (charts[canvasId]) {
+        charts[canvasId].chart.destroy();
+    }
+
+    const ctx = canvas.getContext("2d");
+    const chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{
+                label: "Tarefas",
+                data: valores,
+                backgroundColor: labels.map((_, i) => coresBarra[i % coresBarra.length]),
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    color: '#5B6472',
+                    font: { weight: '600', size: 11 }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+
+    charts[canvasId] = { chart, coluna: "Status da tarefa" };
+    return chart;
+}
+
 // 🚀 Inicialização principal
 window.onload = async () => {
     try {
-        await carregarExcel();
+        const dados = await carregarExcel();
 
         // Atualiza estatísticas
         await atualizarEstatisticas();
-       
+
         // exibirDataB3();
 
         exibirUltimaAtualizacao(); // ⬅️ Adicionada aqui
 
+        // 🆕 Painel de Produtividade da Equipe
+        renderizarTilesResumo(dados);
+        renderizarRankingResponsaveis(dados);
+        renderizarPainelPrazosFataisNovo(dados);
+        gerarGraficoAreaDireito(dados, "graficoAreaDireito");
+        gerarGraficoStatusTarefa(dados, "graficoStatusTarefa");
 
         // 📊 Gráficos principais com filtro "até hoje"
         const colunas = ["Responsável", "Área do Direito"];
