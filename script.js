@@ -803,9 +803,10 @@ function calcularRankingResponsaveis(dados) {
     return Object.values(porResponsavel).sort((a, b) => b.total - a.total);
 }
 
-// 👥 Agrupa uma lista de itens por Responsável, ordenando cada grupo por data
-// e os grupos por quantidade (usado pelos painéis e pelos modais dos tiles)
-function agruparPorResponsavel(itens) {
+// 👥 Agrupa uma lista de itens por Responsável, ordenando cada grupo pela data
+// informada por `extrairData` (por padrão "Data do agendamento") e os grupos
+// por quantidade (usado pelos painéis e pelos modais dos tiles)
+function agruparPorResponsavel(itens, extrairData = (item) => parseDataAgendamento(item["Data do agendamento"])) {
     const porResponsavel = {};
     itens.forEach(item => {
         const resp = (item["Responsável"] || "").trim() || "Sem responsável";
@@ -815,8 +816,8 @@ function agruparPorResponsavel(itens) {
 
     const grupos = Object.entries(porResponsavel).map(([responsavel, registros]) => {
         const ordenados = registros.slice().sort((a, b) => {
-            const dataA = parseDataAgendamento(a["Data do agendamento"]);
-            const dataB = parseDataAgendamento(b["Data do agendamento"]);
+            const dataA = extrairData(a);
+            const dataB = extrairData(b);
             if (!dataA && !dataB) return 0;
             if (!dataA) return 1;
             if (!dataB) return -1;
@@ -826,6 +827,45 @@ function agruparPorResponsavel(itens) {
     });
 
     return grupos.sort((a, b) => b.registros.length - a.registros.length);
+}
+
+// 🚨 Extrai a data do prazo fatal de texto livre (ex.: "FATAL: 24/09 - ...",
+// "Prazo Fatal: 24/09/2026"). O sistema de origem não tem uma coluna de data
+// dedicada para o prazo fatal — só o marcador "Sim/Não" — então a data real
+// vem embutida na descrição. Sem ano explícito no texto, assume o ano da
+// "Data do agendamento" (ou o ano atual, se essa também faltar).
+function extrairDataPrazoFatal(item) {
+    const campos = [
+        "Solicitação - Descrição da Solicitação",
+        "Processo - Descrição",
+        "Observação"
+    ];
+
+    const regex = /(?:prazo\s+)?fatal\s*:?\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i;
+
+    for (const campo of campos) {
+        const texto = item[campo];
+        if (!texto || typeof texto !== "string") continue;
+
+        const match = texto.match(regex);
+        if (!match) continue;
+
+        const dia = parseInt(match[1], 10);
+        const mes = parseInt(match[2], 10) - 1;
+        let ano = match[3] ? parseInt(match[3], 10) : null;
+        if (ano !== null && ano < 100) ano += 2000;
+
+        if (ano === null) {
+            const referencia = parseDataAgendamento(item["Data do agendamento"]);
+            ano = referencia ? referencia.getFullYear() : new Date().getFullYear();
+        }
+
+        if (dia >= 1 && dia <= 31 && mes >= 0 && mes <= 11) {
+            return new Date(ano, mes, dia);
+        }
+    }
+
+    return null;
 }
 
 // 🎨 Monta o HTML de uma lista agrupada por responsável (seções com avatar + tabela),
@@ -862,36 +902,39 @@ function construirListaAgrupadaPorResponsavel(grupos, cabecalhos, renderizarLinh
     }).join("");
 }
 
-// 🚨 Prazos fatais ainda pendentes, agrupados por responsável (com os itens individuais)
+// 🚨 Prazos fatais ainda pendentes, agrupados por responsável (com os itens individuais),
+// ordenados pela data do prazo fatal extraída do texto (não pela Data do agendamento)
 function calcularPrazosFatais(dados) {
     const pendentesComPrazo = dados.filter(item =>
         temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"]) &&
         !statusIndicaConcluida(item["Status da tarefa"])
     );
 
-    return agruparPorResponsavel(pendentesComPrazo);
+    return agruparPorResponsavel(pendentesComPrazo, extrairDataPrazoFatal);
 }
 
-// 🎨 Linha padrão de uma tabela de prazos fatais (Processo ID | Área | Data | Situação)
+// 🎨 Linha padrão de uma tabela de prazos fatais (Processo ID | Área | Prazo Fatal | Situação)
 function linhaPrazoFatal(item) {
+    const dataFatal = extrairDataPrazoFatal(item);
     const situacao = situacaoPrazoItem(item);
     return `
         <tr>
             <td>${item["Processo - ID"] || "-"}</td>
             <td>${item["Área do Direito"] || "-"}</td>
-            <td>${formatarDataExcel(item["Data do agendamento"])}</td>
+            <td>${dataFatal ? formatarDataExcel(dataFatal) : "Não identificado"}</td>
             <td><span class="pill ${situacao.classe}">${situacao.texto}</span></td>
         </tr>
     `;
 }
 
 // 🚨 Situação de vencimento de um item individual de prazo fatal
+// (com base na data do prazo fatal extraída do texto, não na Data do agendamento)
 function situacaoPrazoItem(item) {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    const data = parseDataAgendamento(item["Data do agendamento"]);
-    if (!data) return { texto: "Sem data", classe: "pill-neutral" };
+    const data = extrairDataPrazoFatal(item);
+    if (!data) return { texto: "Data não identificada", classe: "pill-neutral" };
 
     const diffDias = Math.round((data - hoje) / 86400000);
 
@@ -1017,7 +1060,7 @@ function renderizarPainelPrazosFataisNovo(dados) {
 
     container.innerHTML = construirListaAgrupadaPorResponsavel(
         grupos,
-        ["Processo ID", "Área", "Data", "Situação"],
+        ["Processo ID", "Área", "Prazo Fatal", "Situação"],
         linhaPrazoFatal,
         "prazo(s) fatal(is)"
     );
@@ -1100,7 +1143,7 @@ function abrirModalPrazoFatal() {
 
     const corpo = construirListaAgrupadaPorResponsavel(
         grupos,
-        ["Processo ID", "Área", "Data", "Situação"],
+        ["Processo ID", "Área", "Prazo Fatal", "Situação"],
         linhaPrazoFatal,
         "prazo(s) fatal(is)"
     );
