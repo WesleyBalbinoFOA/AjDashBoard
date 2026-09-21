@@ -1,5 +1,5 @@
 // ============================================================
-// View / tiles.js — tiles de resumo do topo (aba Produtividade da equipe)
+// View / tiles.js — tiles de resumo do topo (aba Visão Geral)
 // ============================================================
 
 import { calcularResumoFila } from "../model/aggregations.js";

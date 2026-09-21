@@ -74,6 +74,28 @@ export function situacaoPrazoItem(item) {
     return { texto: `Vence em ${diffDias} dias`, classe: "pill-neutral" };
 }
 
+// 📅 Situação de um item com base na "Data do agendamento" (data de cumprimento
+// da atividade, diferente do prazo fatal extraído do texto). Usado na aba
+// "Atividades por Responsável" para deixar claro o que já está vencido.
+export function situacaoAgendamento(item) {
+    if (statusIndicaConcluida(item["Status da tarefa"])) {
+        return { texto: "Concluído", classe: "pill-neutral" };
+    }
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const data = parseDataAgendamento(item["Data do agendamento"]);
+    if (!data) return { texto: "Data não identificada", classe: "pill-neutral" };
+
+    const diffDias = Math.round((data - hoje) / 86400000);
+
+    if (diffDias < 0) return { texto: `${Math.abs(diffDias)} dia(s) em atraso`, classe: "pill-crit" };
+    if (diffDias === 0) return { texto: "Vence hoje", classe: "pill-crit" };
+    if (diffDias === 1) return { texto: "Vence amanhã", classe: "pill-warn" };
+    return { texto: `Vence em ${diffDias} dias`, classe: "pill-neutral" };
+}
+
 // 🆕 Função para obter a descrição preenchida (ordem de prioridade)
 export function obterDescricao(registro) {
     // Função auxiliar para verificar se um campo está realmente preenchido

@@ -20,7 +20,7 @@ export function calcularRankingResponsaveis(dados) {
         if (!resp) return;
 
         if (!porResponsavel[resp]) {
-            porResponsavel[resp] = { nome: resp, hoje: 0, amanha: 0, total: 0 };
+            porResponsavel[resp] = { nome: resp, hoje: 0, amanha: 0, pendentes: 0, total: 0 };
         }
         porResponsavel[resp].total++;
 
@@ -29,6 +29,12 @@ export function calcularRankingResponsaveis(dados) {
             porResponsavel[resp].hoje++;
         } else if (data && mesmoDia(data, amanha)) {
             porResponsavel[resp].amanha++;
+        }
+
+        // Pendente = ainda ativa e com data já vencida ou até hoje (qualquer
+        // atraso), ou sem data identificada; superconjunto de "hoje".
+        if (!data || data <= hoje) {
+            porResponsavel[resp].pendentes++;
         }
     });
 
@@ -138,6 +144,44 @@ export function obterListaResponsaveis(dados) {
         if (nome) nomes.add(nome);
     });
     return Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+// 👤 Agrupa as atividades de um responsável em pendentes (vencidas + até hoje,
+// qualquer que seja o atraso — se ainda está na planilha, não foi cumprida),
+// futuras (a partir de amanhã) e todos os compromissos (lista completa, sem
+// filtro de status ou data)
+export function agruparAtividadesPorResponsavel(dados, nome) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const doResponsavel = dados.filter(item => (item["Responsável"] || "").trim() === nome);
+
+    const ordenarPorData = (lista) => lista.slice().sort((a, b) => {
+        const dataA = parseDataAgendamento(a["Data do agendamento"]);
+        const dataB = parseDataAgendamento(b["Data do agendamento"]);
+        if (!dataA && !dataB) return 0;
+        if (!dataA) return 1;
+        if (!dataB) return -1;
+        return dataA - dataB;
+    });
+
+    const pendentes = doResponsavel.filter(item => {
+        if (statusIndicaConcluida(item["Status da tarefa"])) return false;
+        const data = parseDataAgendamento(item["Data do agendamento"]);
+        return !data || data <= hoje;
+    });
+
+    const futuras = doResponsavel.filter(item => {
+        if (statusIndicaConcluida(item["Status da tarefa"])) return false;
+        const data = parseDataAgendamento(item["Data do agendamento"]);
+        return data && data > hoje;
+    });
+
+    return {
+        pendentes: ordenarPorData(pendentes),
+        futuras: ordenarPorData(futuras),
+        todos: ordenarPorData(doResponsavel)
+    };
 }
 
 // Tarefas ativas cuja "Data do agendamento" cai exatamente em `dia`

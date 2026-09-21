@@ -42,7 +42,7 @@
     </div>
 
     <div class="topbar-tabs" id="topbarTabs">
-      <button type="button" class="topbar-tab active" data-aba="produtividade" onclick="ativarAba('produtividade')">Produtividade da equipe</button>
+      <button type="button" class="topbar-tab active" data-aba="produtividade" onclick="ativarAba('produtividade')">Visão Geral</button>
       <button type="button" class="topbar-tab" data-aba="atividades" onclick="ativarAba('atividades')">Atividades por Responsável</button>
       <button type="button" class="topbar-tab" data-aba="prazos" onclick="ativarAba('prazos')">Prazos e Riscos</button>
       <button type="button" class="topbar-tab" data-aba="audiencias" onclick="ativarAba('audiencias')">Audiências Agendadas</button>
@@ -60,7 +60,7 @@
 </header>
   <div class="container">
 
-  <!-- ===== Aba: Produtividade da equipe ===== -->
+  <!-- ===== Aba: Visão Geral ===== -->
   <section class="tab-panel" data-aba="produtividade">
 
     <!-- Tiles de resumo -->
@@ -132,7 +132,7 @@
             <thead>
               <tr>
                 <th>Responsável</th>
-                <th>Hoje</th>
+                <th>Pendentes</th>
                 <th>Amanhã</th>
                 <th>Total</th>
                 <th>Carga</th>
@@ -174,24 +174,72 @@
       <div class="panel-header">
         <div>
           <h4 class="panel-title">Prazos e tarefas por pessoa</h4>
-          <p class="panel-sub" id="tabelaAtividadesResponsavelMeta">Selecione um responsável para ver os prazos dele(a)</p>
+          <p class="panel-sub">Selecione um responsável para ver os prazos dele(a)</p>
         </div>
       </div>
       <div class="person-tabs" id="tabsResponsavelAtividades"></div>
-      <div style="overflow-x:auto;">
-        <table class="ranking-table" id="tabelaAtividadesResponsavel">
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Processo ID</th>
-              <th>Tipo</th>
-              <th>Status</th>
-              <th>Prazo Fatal</th>
-              <th>Descrição</th>
-            </tr>
-          </thead>
-          <tbody id="tabelaAtividadesResponsavelBody"></tbody>
-        </table>
+
+      <div class="responsavel-subsecao">
+        <h5 class="responsavel-subsecao-titulo">Prazos pendentes</h5>
+        <p class="panel-sub" id="tabelaAtividadesPendentesMeta">-</p>
+        <div style="overflow-x:auto;">
+          <table class="ranking-table" id="tabelaAtividadesPendentes">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Processo ID</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Situação</th>
+                <th>Prazo Fatal</th>
+                <th>Descrição</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaAtividadesPendentesBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="responsavel-subsecao">
+        <h5 class="responsavel-subsecao-titulo">Prazos futuros</h5>
+        <p class="panel-sub" id="tabelaAtividadesFuturasMeta">-</p>
+        <div style="overflow-x:auto;">
+          <table class="ranking-table" id="tabelaAtividadesFuturas">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Processo ID</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Situação</th>
+                <th>Prazo Fatal</th>
+                <th>Descrição</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaAtividadesFuturasBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="responsavel-subsecao">
+        <h5 class="responsavel-subsecao-titulo">Todos os compromissos</h5>
+        <p class="panel-sub" id="tabelaAtividadesTodasMeta">-</p>
+        <div style="overflow-x:auto;">
+          <table class="ranking-table" id="tabelaAtividadesTodas">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Processo ID</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Situação</th>
+                <th>Prazo Fatal</th>
+                <th>Descrição</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaAtividadesTodasBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </section>
