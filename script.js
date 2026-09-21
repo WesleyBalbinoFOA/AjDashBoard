@@ -80,12 +80,26 @@ function exibirUltimaAtualizacao() {
     try {
         el.innerHTML = `
         <span class="dot"></span>
-        <span title="${raw}">Pauta atualizada ${dataB3Formatada}</span>
+        <span title="${raw}">Atualizado em ${formatarDataCurta(dataB3Formatada)}</span>
         `;
     } catch (e) {
         console.warn("Erro ao formatar data:", e);
         el.innerHTML = `<span class="dot" style="background:var(--crit);"></span><em>Erro na data</em>`;
     }
+}
+
+// Encurta "DD/MM/AAAA HH:MM:SS" para "DD/MM/AA HH:MM" (indicador do topbar,
+// onde espaço é curto); o valor completo continua no atributo title.
+function formatarDataCurta(dataFormatada) {
+    if (!dataFormatada) return dataFormatada;
+
+    const match = dataFormatada.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+    if (!match) return dataFormatada;
+
+    const [, dia, mes, ano, hora, minuto] = match;
+    const anoCurto = ano.slice(-2);
+
+    return hora ? `${dia}/${mes}/${anoCurto} ${hora}:${minuto}` : `${dia}/${mes}/${anoCurto}`;
 }
 
 
