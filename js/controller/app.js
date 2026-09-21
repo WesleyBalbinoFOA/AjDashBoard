@@ -17,7 +17,7 @@ import {
     linhaPrazoFatal
 } from "../view/tables.js";
 import { gerarGraficoAreaDireito, gerarGraficoStatusTarefa } from "../view/charts.js";
-import { ativarAba, popularTabsResponsaveis } from "../view/tabs.js";
+import { ativarAba, popularTabsResponsaveis, inicializarFiltroAtividades } from "../view/tabs.js";
 import { abrirModal, fecharModal } from "../view/modal.js";
 import { inicializarTema } from "../view/theme.js";
 
@@ -84,6 +84,7 @@ window.onload = async () => {
         gerarGraficoStatusTarefa(dados, "graficoStatusTarefa");
 
         // 🆕 Aba "Atividades por Responsável"
+        inicializarFiltroAtividades(dados);
         popularTabsResponsaveis(dados);
 
         // 🆕 Aba "Audiências Agendadas"

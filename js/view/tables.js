@@ -144,40 +144,38 @@ function linhaAtividadeResponsavel(item) {
     `;
 }
 
-function preencherTabelaAtividades(corpoId, metaId, itens, nome, rotulo, rotuloVazio) {
-    const corpo = document.getElementById(corpoId);
+const ROTULO_FILTRO_ATIVIDADES = {
+    pendentes: "prazo(s) pendente(s)",
+    futuras: "prazo(s) futuro(s)",
+    todos: "compromisso(s)"
+};
+
+const VAZIO_FILTRO_ATIVIDADES = {
+    pendentes: "Nenhum prazo pendente para este responsável",
+    futuras: "Nenhum prazo futuro para este responsável",
+    todos: "Nenhuma atividade encontrada para este responsável"
+};
+
+// 🎨 Renderiza a tabela de atividades do responsável selecionado, filtrada por
+// situação: "pendentes" (vencidas + até hoje, qualquer que seja o atraso — se
+// ainda está na planilha, não foi cumprida), "futuras" (a partir de amanhã)
+// ou "todos" (lista completa, sem filtro de status ou data)
+export function renderizarAtividadesPorResponsavel(dados, nome, filtro = "pendentes") {
+    const corpo = document.getElementById("tabelaAtividadesResponsavelBody");
     if (!corpo) return;
 
-    const meta = document.getElementById(metaId);
-    if (meta) meta.textContent = `${itens.length} ${rotulo} de ${nome}`;
+    const grupos = agruparAtividadesPorResponsavel(dados, nome);
+    const itens = grupos[filtro] || grupos.pendentes;
+
+    const meta = document.getElementById("tabelaAtividadesResponsavelMeta");
+    if (meta) meta.textContent = `${itens.length} ${ROTULO_FILTRO_ATIVIDADES[filtro]} de ${nome}`;
 
     if (!itens.length) {
-        corpo.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ink-faint);">${rotuloVazio}</td></tr>`;
+        corpo.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ink-faint);">${VAZIO_FILTRO_ATIVIDADES[filtro]}</td></tr>`;
         return;
     }
 
     corpo.innerHTML = itens.map(linhaAtividadeResponsavel).join("");
-}
-
-// 🎨 Renderiza as 3 visões de atividades do responsável selecionado: prazos
-// pendentes (vencidos + até hoje, qualquer que seja o atraso — se ainda está
-// na planilha, não foi cumprido), prazos futuros (a partir de amanhã) e
-// todos os compromissos (lista completa, sem filtro de status ou data)
-export function renderizarAtividadesPorResponsavel(dados, nome) {
-    const { pendentes, futuras, todos } = agruparAtividadesPorResponsavel(dados, nome);
-
-    preencherTabelaAtividades(
-        "tabelaAtividadesPendentesBody", "tabelaAtividadesPendentesMeta",
-        pendentes, nome, "prazo(s) pendente(s)", "Nenhum prazo pendente para este responsável"
-    );
-    preencherTabelaAtividades(
-        "tabelaAtividadesFuturasBody", "tabelaAtividadesFuturasMeta",
-        futuras, nome, "prazo(s) futuro(s)", "Nenhum prazo futuro para este responsável"
-    );
-    preencherTabelaAtividades(
-        "tabelaAtividadesTodasBody", "tabelaAtividadesTodasMeta",
-        todos, nome, "compromisso(s)", "Nenhuma atividade encontrada para este responsável"
-    );
 }
 
 // 🎨 Renderiza a tabela de audiências agendadas (padrão visual dos novos painéis)
