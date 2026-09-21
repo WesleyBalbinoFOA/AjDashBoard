@@ -169,6 +169,27 @@ body {
   flex: 0 0 auto;
 }
 
+.theme-toggle {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.theme-toggle:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
 /* ===== Seção "Visão geral" ===== */
 .section-label {
   font-size: 0.7rem;
