@@ -516,6 +516,21 @@ body {
   color: var(--ink-faint);
 }
 
+/* ===== Subseções da aba "Atividades por Responsável" (pendentes/futuros/todos) ===== */
+.responsavel-subsecao {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.responsavel-subsecao-titulo {
+  font-family: 'Lexend', sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ink);
+  margin: 0;
+}
+
 .footer-note {
   text-align: center;
   color: var(--ink-faint);

@@ -3,8 +3,8 @@
 // ============================================================
 
 import { parseDataAgendamento, formatarDataExcel } from "../model/dateUtils.js";
-import { temPrazoFatalSim, extrairDataPrazoFatal, situacaoPrazoItem, obterDescricao, pillClasseStatus } from "../model/domain.js";
-import { calcularRankingResponsaveis, calcularPrazosFatais } from "../model/aggregations.js";
+import { temPrazoFatalSim, extrairDataPrazoFatal, situacaoPrazoItem, situacaoAgendamento, obterDescricao, pillClasseStatus } from "../model/domain.js";
+import { calcularRankingResponsaveis, calcularPrazosFatais, agruparAtividadesPorResponsavel } from "../model/aggregations.js";
 
 // 🎨 Monta o HTML de uma lista agrupada por responsável (seções com avatar + tabela),
 // usado tanto no painel "Prazos e Riscos" quanto nos modais dos tiles do topo
@@ -90,7 +90,7 @@ export function renderizarRankingResponsaveis(dados) {
                         <span>${r.nome}</span>
                     </div>
                 </td>
-                <td class="num">${r.hoje || "—"}</td>
+                <td class="num">${r.pendentes || "—"}</td>
                 <td class="num">${r.amanha || "—"}</td>
                 <td class="num">${r.total}</td>
                 <td>
@@ -123,47 +123,61 @@ export function renderizarPainelPrazosFataisNovo(dados) {
     );
 }
 
-// 🎨 Renderiza a tabela de prazos/tarefas do responsável selecionado
-export function renderizarAtividadesPorResponsavel(dados, nome) {
-    const corpo = document.getElementById("tabelaAtividadesResponsavelBody");
+// 🎨 Linha de uma atividade na aba "Atividades por Responsável" (inclui a
+// situação de vencimento com base na "Data do agendamento")
+function linhaAtividadeResponsavel(item) {
+    const prazoFatal = temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"])
+        ? `<span class="pill pill-crit">Sim</span>`
+        : `<span class="pill pill-neutral">Não</span>`;
+    const situacao = situacaoAgendamento(item);
+
+    return `
+        <tr>
+            <td>${formatarDataExcel(item["Data do agendamento"])}</td>
+            <td>${item["Processo - ID"] || "-"}</td>
+            <td>${item["Tipo"] || "-"}</td>
+            <td>${item["Status da tarefa"] || "-"}</td>
+            <td><span class="pill ${situacao.classe}">${situacao.texto}</span></td>
+            <td>${prazoFatal}</td>
+            <td>${obterDescricao(item)}</td>
+        </tr>
+    `;
+}
+
+function preencherTabelaAtividades(corpoId, metaId, itens, nome, rotulo, rotuloVazio) {
+    const corpo = document.getElementById(corpoId);
     if (!corpo) return;
 
-    const atividades = dados
-        .filter(item => (item["Responsável"] || "").trim() === nome)
-        .slice()
-        .sort((a, b) => {
-            const dataA = parseDataAgendamento(a["Data do agendamento"]);
-            const dataB = parseDataAgendamento(b["Data do agendamento"]);
-            if (!dataA && !dataB) return 0;
-            if (!dataA) return 1;
-            if (!dataB) return -1;
-            return dataA - dataB;
-        });
+    const meta = document.getElementById(metaId);
+    if (meta) meta.textContent = `${itens.length} ${rotulo} de ${nome}`;
 
-    const meta = document.getElementById("tabelaAtividadesResponsavelMeta");
-    if (meta) meta.textContent = `${atividades.length} tarefa(s) de ${nome}`;
-
-    if (!atividades.length) {
-        corpo.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--ink-faint);">Nenhuma atividade encontrada para este responsável</td></tr>`;
+    if (!itens.length) {
+        corpo.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ink-faint);">${rotuloVazio}</td></tr>`;
         return;
     }
 
-    corpo.innerHTML = atividades.map(item => {
-        const prazoFatal = temPrazoFatalSim(item["Solicitação - Há Prazo Fatal"])
-            ? `<span class="pill pill-crit">Sim</span>`
-            : `<span class="pill pill-neutral">Não</span>`;
+    corpo.innerHTML = itens.map(linhaAtividadeResponsavel).join("");
+}
 
-        return `
-            <tr>
-                <td>${formatarDataExcel(item["Data do agendamento"])}</td>
-                <td>${item["Processo - ID"] || "-"}</td>
-                <td>${item["Tipo"] || "-"}</td>
-                <td>${item["Status da tarefa"] || "-"}</td>
-                <td>${prazoFatal}</td>
-                <td>${obterDescricao(item)}</td>
-            </tr>
-        `;
-    }).join("");
+// 🎨 Renderiza as 3 visões de atividades do responsável selecionado: prazos
+// pendentes (vencidos + até hoje, qualquer que seja o atraso — se ainda está
+// na planilha, não foi cumprido), prazos futuros (a partir de amanhã) e
+// todos os compromissos (lista completa, sem filtro de status ou data)
+export function renderizarAtividadesPorResponsavel(dados, nome) {
+    const { pendentes, futuras, todos } = agruparAtividadesPorResponsavel(dados, nome);
+
+    preencherTabelaAtividades(
+        "tabelaAtividadesPendentesBody", "tabelaAtividadesPendentesMeta",
+        pendentes, nome, "prazo(s) pendente(s)", "Nenhum prazo pendente para este responsável"
+    );
+    preencherTabelaAtividades(
+        "tabelaAtividadesFuturasBody", "tabelaAtividadesFuturasMeta",
+        futuras, nome, "prazo(s) futuro(s)", "Nenhum prazo futuro para este responsável"
+    );
+    preencherTabelaAtividades(
+        "tabelaAtividadesTodasBody", "tabelaAtividadesTodasMeta",
+        todos, nome, "compromisso(s)", "Nenhuma atividade encontrada para este responsável"
+    );
 }
 
 // 🎨 Renderiza a tabela de audiências agendadas (padrão visual dos novos painéis)
