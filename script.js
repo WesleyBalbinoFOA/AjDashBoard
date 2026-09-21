@@ -80,12 +80,26 @@ function exibirUltimaAtualizacao() {
     try {
         el.innerHTML = `
         <span class="dot"></span>
-        <span title="${raw}">Pauta atualizada ${dataB3Formatada}</span>
+        <span title="${raw}">Atualizado em ${formatarDataCurta(dataB3Formatada)}</span>
         `;
     } catch (e) {
         console.warn("Erro ao formatar data:", e);
         el.innerHTML = `<span class="dot" style="background:var(--crit);"></span><em>Erro na data</em>`;
     }
+}
+
+// Encurta "DD/MM/AAAA HH:MM:SS" para "DD/MM/AA HH:MM" (indicador do topbar,
+// onde espaço é curto); o valor completo continua no atributo title.
+function formatarDataCurta(dataFormatada) {
+    if (!dataFormatada) return dataFormatada;
+
+    const match = dataFormatada.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+    if (!match) return dataFormatada;
+
+    const [, dia, mes, ano, hora, minuto] = match;
+    const anoCurto = ano.slice(-2);
+
+    return hora ? `${dia}/${mes}/${anoCurto} ${hora}:${minuto}` : `${dia}/${mes}/${anoCurto}`;
 }
 
 
@@ -1161,6 +1175,14 @@ function obterListaResponsaveis(dados) {
     return Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
+// Abrevia o nome para caber na aba (primeiro + último nome); nomes com até
+// duas palavras já são curtos o bastante e voltam sem alteração
+function nomeResumido(nomeCompleto) {
+    const partes = nomeCompleto.trim().split(/\s+/).filter(Boolean);
+    if (partes.length <= 2) return nomeCompleto;
+    return `${partes[0]} ${partes[partes.length - 1]}`;
+}
+
 // 🎨 Monta as abas de responsável da aba "Atividades por Responsável" e renderiza a primeira
 function popularTabsResponsaveis(dados) {
     const container = document.getElementById("tabsResponsavelAtividades");
@@ -1173,7 +1195,8 @@ function popularTabsResponsaveis(dados) {
         const aba = document.createElement("button");
         aba.type = "button";
         aba.className = "person-tab" + (index === 0 ? " active" : "");
-        aba.textContent = nome;
+        aba.textContent = nomeResumido(nome);
+        aba.title = nome;
         aba.addEventListener("click", () => {
             container.querySelectorAll(".person-tab").forEach(el => el.classList.remove("active"));
             aba.classList.add("active");

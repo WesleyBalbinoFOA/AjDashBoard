@@ -63,7 +63,10 @@ body {
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  flex-wrap: wrap;
+  /* As abas já rolam horizontalmente por conta própria (.topbar-tabs), então
+     não deixamos o indicador de atualização quebrar linha e "descer" para
+     dentro do menu — isso só volta a acontecer no empilhamento mobile abaixo. */
+  flex-wrap: nowrap;
 }
 
 .brand-mark {
@@ -150,7 +153,7 @@ body {
 .topbar-updated {
   flex: 0 0 auto;
   margin-left: auto;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   color: var(--ink-faint);
   display: flex;
   align-items: center;
@@ -173,6 +176,7 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-faint);
+  margin-top: 1.5rem;
   margin-bottom: 0.6rem;
 }
 
@@ -621,6 +625,7 @@ body {
 @media (max-width: 768px) {
   .topbar-inner {
     padding: 0.75rem 1rem;
+    flex-wrap: wrap;
   }
 
   .topbar-tabs {
