@@ -308,26 +308,50 @@ body {
   margin: 0.15rem 0 0;
 }
 
-.responsavel-select {
-  /* Materialize esconde <select> nativos (display:none) para trocar por um
-     dropdown próprio via JS; como não inicializamos esse componente aqui,
-     forçamos a exibição do select nativo, que já é responsivo por padrão. */
-  display: inline-block !important;
-  flex: 0 0 auto;
-  padding: 0.45rem 0.7rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--ink);
-  font-family: 'Inter', sans-serif;
-  font-size: 0.85rem;
-  min-width: 200px;
-  max-width: 100%;
+/* Abas de seleção de pessoa (ex.: "Atividades por Responsável") — mesmo
+   padrão visual das abas do topbar, com rolagem horizontal responsiva */
+.person-tabs {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.responsavel-select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.person-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.person-tab {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border: none;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.person-tab:hover {
+  background: var(--surface-sunken);
+}
+
+.person-tab.active {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.person-tab.active:hover {
+  background: var(--accent-soft);
 }
 
 .chart-box {
