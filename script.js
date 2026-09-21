@@ -1161,6 +1161,14 @@ function obterListaResponsaveis(dados) {
     return Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
+// Abrevia o nome para caber na aba (primeiro + último nome); nomes com até
+// duas palavras já são curtos o bastante e voltam sem alteração
+function nomeResumido(nomeCompleto) {
+    const partes = nomeCompleto.trim().split(/\s+/).filter(Boolean);
+    if (partes.length <= 2) return nomeCompleto;
+    return `${partes[0]} ${partes[partes.length - 1]}`;
+}
+
 // 🎨 Monta as abas de responsável da aba "Atividades por Responsável" e renderiza a primeira
 function popularTabsResponsaveis(dados) {
     const container = document.getElementById("tabsResponsavelAtividades");
@@ -1173,7 +1181,8 @@ function popularTabsResponsaveis(dados) {
         const aba = document.createElement("button");
         aba.type = "button";
         aba.className = "person-tab" + (index === 0 ? " active" : "");
-        aba.textContent = nome;
+        aba.textContent = nomeResumido(nome);
+        aba.title = nome;
         aba.addEventListener("click", () => {
             container.querySelectorAll(".person-tab").forEach(el => el.classList.remove("active"));
             aba.classList.add("active");
