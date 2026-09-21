@@ -1161,18 +1161,28 @@ function obterListaResponsaveis(dados) {
     return Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
-// 🎨 Preenche o <select> da aba "Atividades por Responsável" e renderiza a primeira opção
-function popularSelectResponsaveis(dados) {
-    const select = document.getElementById("selectResponsavelAtividades");
-    if (!select) return;
+// 🎨 Monta as abas de responsável da aba "Atividades por Responsável" e renderiza a primeira
+function popularTabsResponsaveis(dados) {
+    const container = document.getElementById("tabsResponsavelAtividades");
+    if (!container) return;
 
     const nomes = obterListaResponsaveis(dados);
-    select.innerHTML = nomes.map(nome => `<option value="${nome}">${nome}</option>`).join("");
+    container.innerHTML = "";
 
-    select.onchange = () => renderizarAtividadesPorResponsavel(dados, select.value);
+    nomes.forEach((nome, index) => {
+        const aba = document.createElement("button");
+        aba.type = "button";
+        aba.className = "person-tab" + (index === 0 ? " active" : "");
+        aba.textContent = nome;
+        aba.addEventListener("click", () => {
+            container.querySelectorAll(".person-tab").forEach(el => el.classList.remove("active"));
+            aba.classList.add("active");
+            renderizarAtividadesPorResponsavel(dados, nome);
+        });
+        container.appendChild(aba);
+    });
 
     if (nomes.length) {
-        select.value = nomes[0];
         renderizarAtividadesPorResponsavel(dados, nomes[0]);
     }
 }
@@ -1439,7 +1449,7 @@ window.onload = async () => {
         gerarGraficoStatusTarefa(dados, "graficoStatusTarefa");
 
         // 🆕 Aba "Atividades por Responsável"
-        popularSelectResponsaveis(dados);
+        popularTabsResponsaveis(dados);
 
         // 🆕 Aba "Audiências Agendadas"
         renderizarPainelAudiencias(dados);
