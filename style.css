@@ -516,19 +516,37 @@ body {
   color: var(--ink-faint);
 }
 
-/* ===== Subseções da aba "Atividades por Responsável" (pendentes/futuros/todos) ===== */
-.responsavel-subsecao {
-  margin-top: 1.75rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+/* ===== Filtro de situação da aba "Atividades por Responsável" ===== */
+.filtro-atividades {
+  display: flex;
+  gap: 0.4rem;
+  flex: 0 0 auto;
 }
 
-.responsavel-subsecao-titulo {
-  font-family: 'Lexend', sans-serif;
+.filtro-atividades-btn {
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: 'Inter', sans-serif;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.filtro-atividades-btn:hover {
+  background: var(--surface-sunken);
+}
+
+.filtro-atividades-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--ink);
-  margin: 0;
 }
 
 .footer-note {

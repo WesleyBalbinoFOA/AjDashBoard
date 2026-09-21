@@ -19,6 +19,12 @@ export function ativarAba(nome) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// Estado da aba "Atividades por Responsável": pessoa e filtro de situação
+// selecionados atualmente (compartilhado entre as abas de pessoa e os botões
+// de filtro pendentes/futuras/todos).
+let nomeAtividadesAtual = null;
+let filtroAtividadesAtual = "pendentes";
+
 // 🎨 Monta as abas de responsável da aba "Atividades por Responsável" e renderiza a primeira
 export function popularTabsResponsaveis(dados) {
     const container = document.getElementById("tabsResponsavelAtividades");
@@ -36,12 +42,33 @@ export function popularTabsResponsaveis(dados) {
         aba.addEventListener("click", () => {
             container.querySelectorAll(".person-tab").forEach(el => el.classList.remove("active"));
             aba.classList.add("active");
-            renderizarAtividadesPorResponsavel(dados, nome);
+            nomeAtividadesAtual = nome;
+            renderizarAtividadesPorResponsavel(dados, nome, filtroAtividadesAtual);
         });
         container.appendChild(aba);
     });
 
     if (nomes.length) {
-        renderizarAtividadesPorResponsavel(dados, nomes[0]);
+        nomeAtividadesAtual = nomes[0];
+        renderizarAtividadesPorResponsavel(dados, nomes[0], filtroAtividadesAtual);
     }
+}
+
+// 🎨 Liga os botões de filtro (Pendentes/Futuros/Todos) da aba "Atividades por
+// Responsável": clicar em um desmarca os demais e refiltra a tabela da pessoa
+// atualmente selecionada.
+export function inicializarFiltroAtividades(dados) {
+    const botoes = document.querySelectorAll(".filtro-atividades-btn");
+    if (!botoes.length) return;
+
+    botoes.forEach(botao => {
+        botao.classList.toggle("active", botao.dataset.filtro === filtroAtividadesAtual);
+        botao.addEventListener("click", () => {
+            filtroAtividadesAtual = botao.dataset.filtro;
+            botoes.forEach(b => b.classList.toggle("active", b === botao));
+            if (nomeAtividadesAtual) {
+                renderizarAtividadesPorResponsavel(dados, nomeAtividadesAtual, filtroAtividadesAtual);
+            }
+        });
+    });
 }
