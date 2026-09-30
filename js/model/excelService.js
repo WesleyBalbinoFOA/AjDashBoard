@@ -62,8 +62,8 @@ async function baixarPlanilha() {
     if (!excelUrl) {
         throw new ErroPlanilha(
             "O link da planilha não está configurado.",
-            "Crie o arquivo env.js a partir do env.example.js (na raiz do projeto) " +
-            "e preencha EXCEL_URL com o link de download da planilha.",
+            "Crie o arquivo env.js na raiz do projeto com o conteúdo: " +
+            "window.ENV = { EXCEL_URL: \"<link de download da planilha>\" };",
             "window.ENV.EXCEL_URL vazio ou env.js não carregado"
         );
     }
