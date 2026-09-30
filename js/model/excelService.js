@@ -41,6 +41,88 @@ export function capturarDadosCelulas(worksheet) {
     }
 }
 
+// ⚠️ Erro com mensagem amigável para exibir na tela de carregamento
+export class ErroPlanilha extends Error {
+    constructor(titulo, orientacao, detalheTecnico) {
+        super(`${titulo} ${orientacao}`);
+        this.name = "ErroPlanilha";
+        this.titulo = titulo;
+        this.orientacao = orientacao;
+        this.detalheTecnico = detalheTecnico;
+    }
+}
+
+const ORIENTACAO_LINK =
+    "No SharePoint, abra a planilha em Compartilhar → Configurações do link, " +
+    "escolha \"Qualquer pessoa com o link\", copie o novo link e atualize " +
+    "EXCEL_URL no arquivo env.js.";
+
+// 📥 Baixa a planilha e garante que o conteúdo é realmente um .xlsx
+async function baixarPlanilha() {
+    if (!excelUrl) {
+        throw new ErroPlanilha(
+            "O link da planilha não está configurado.",
+            "Crie o arquivo env.js a partir do env.example.js (na raiz do projeto) " +
+            "e preencha EXCEL_URL com o link de download da planilha.",
+            "window.ENV.EXCEL_URL vazio ou env.js não carregado"
+        );
+    }
+
+    let response;
+    try {
+        response = await fetch(excelUrl);
+    } catch (erroRede) {
+        // fetch só lança exceção em falha de rede ou bloqueio de CORS —
+        // no SharePoint isso normalmente significa que o link exige login.
+        throw new ErroPlanilha(
+            "Não foi possível acessar a planilha no SharePoint.",
+            "Verifique sua conexão. Se a internet estiver ok, o link provavelmente " +
+            "exige login ou não é público. " + ORIENTACAO_LINK,
+            erroRede.message
+        );
+    }
+
+    if (response.status === 401 || response.status === 403) {
+        throw new ErroPlanilha(
+            "Sem permissão para acessar a planilha.",
+            "O link exige login ou o compartilhamento foi removido. " + ORIENTACAO_LINK,
+            `HTTP ${response.status}`
+        );
+    }
+    if (response.status === 404) {
+        throw new ErroPlanilha(
+            "A planilha não foi encontrada.",
+            "O arquivo pode ter sido movido, renomeado ou excluído. " + ORIENTACAO_LINK,
+            "HTTP 404"
+        );
+    }
+    if (!response.ok) {
+        throw new ErroPlanilha(
+            "O SharePoint retornou um erro ao baixar a planilha.",
+            "Tente novamente em alguns minutos. Se persistir, confira o link em env.js.",
+            `HTTP ${response.status} ${response.statusText}`
+        );
+    }
+
+    const buffer = await response.arrayBuffer();
+
+    // Um .xlsx é um arquivo ZIP e sempre começa com os bytes "PK".
+    // Se o SharePoint devolver uma página HTML (login, acesso negado,
+    // link expirado), o XLSX.read tenta ler como tabela HTML e falha
+    // com "Invalid HTML: could not find <table>".
+    const bytes = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
+    if (bytes[0] !== 0x50 || bytes[1] !== 0x4B) {
+        throw new ErroPlanilha(
+            "O link não retornou a planilha Excel — o compartilhamento provavelmente expirou.",
+            "O SharePoint devolveu uma página (login ou acesso negado) em vez do arquivo. " +
+            ORIENTACAO_LINK,
+            `Content-Type recebido: ${response.headers.get("content-type") || "desconhecido"}`
+        );
+    }
+
+    return buffer;
+}
+
 // 🔄 Função carregarExcel MODIFICADA para incluir captura da célula B3
 export async function carregarExcel() {
     if (dadosExcel.length) {
@@ -64,26 +146,7 @@ export async function carregarExcel() {
     console.log("🔄 Carregando dados do Excel...");
 
     try {
-        const response = await fetch(excelUrl);
-        if (!response.ok) {
-            throw new Error(`Falha ao baixar a planilha (HTTP ${response.status} ${response.statusText}).`);
-        }
-
-        const buffer = await response.arrayBuffer();
-
-        // Um .xlsx é um arquivo ZIP e sempre começa com os bytes "PK".
-        // Se o SharePoint devolver uma página HTML (login, acesso negado,
-        // link expirado), o XLSX.read tenta ler como tabela HTML e falha
-        // com "Invalid HTML: could not find <table>".
-        const bytes = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
-        if (bytes[0] !== 0x50 || bytes[1] !== 0x4B) {
-            throw new Error(
-                "O link da planilha não retornou um arquivo Excel (.xlsx). " +
-                "Provavelmente o compartilhamento do SharePoint expirou, exige login " +
-                "ou não está como \"Qualquer pessoa com o link\". Gere um novo link " +
-                "de compartilhamento e atualize excelUrl em js/model/state.js."
-            );
-        }
+        const buffer = await baixarPlanilha();
 
         const workbook = XLSX.read(buffer, { type: "array" });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
