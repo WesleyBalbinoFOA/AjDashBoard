@@ -65,8 +65,25 @@ export async function carregarExcel() {
 
     try {
         const response = await fetch(excelUrl);
-        const blob = await response.blob();
-        const buffer = await blob.arrayBuffer();
+        if (!response.ok) {
+            throw new Error(`Falha ao baixar a planilha (HTTP ${response.status} ${response.statusText}).`);
+        }
+
+        const buffer = await response.arrayBuffer();
+
+        // Um .xlsx é um arquivo ZIP e sempre começa com os bytes "PK".
+        // Se o SharePoint devolver uma página HTML (login, acesso negado,
+        // link expirado), o XLSX.read tenta ler como tabela HTML e falha
+        // com "Invalid HTML: could not find <table>".
+        const bytes = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
+        if (bytes[0] !== 0x50 || bytes[1] !== 0x4B) {
+            throw new Error(
+                "O link da planilha não retornou um arquivo Excel (.xlsx). " +
+                "Provavelmente o compartilhamento do SharePoint expirou, exige login " +
+                "ou não está como \"Qualquer pessoa com o link\". Gere um novo link " +
+                "de compartilhamento e atualize excelUrl em js/model/state.js."
+            );
+        }
 
         const workbook = XLSX.read(buffer, { type: "array" });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];

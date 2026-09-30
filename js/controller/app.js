@@ -106,7 +106,7 @@ window.onload = async () => {
                 <div class="loading-content">
                     <i class="material-icons" style="font-size: 4rem; color: #f44336;">error</i>
                     <h5 style="color: #f44336;">Erro ao carregar dados</h5>
-                    <p>Verifique a conexão e tente novamente</p>
+                    <p>${error && error.message ? error.message : 'Verifique a conexão e tente novamente'}</p>
                 </div>
             `;
         }
