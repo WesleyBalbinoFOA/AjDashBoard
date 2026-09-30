@@ -102,13 +102,23 @@ window.onload = async () => {
         console.error('❌ Erro ao carregar dashboard:', error);
         const loadingOverlay = document.getElementById('loadingOverlay');
         if (loadingOverlay) {
+            const titulo = error.titulo || 'Erro ao carregar dados';
+            const orientacao = error.orientacao || 'Verifique a conexão e tente novamente.';
+            const detalhe = error.detalheTecnico || error.message || '';
             loadingOverlay.innerHTML = `
-                <div class="loading-content">
+                <div class="loading-content" style="max-width: 560px; padding: 0 16px;">
                     <i class="material-icons" style="font-size: 4rem; color: #f44336;">error</i>
-                    <h5 style="color: #f44336;">Erro ao carregar dados</h5>
-                    <p>Verifique a conexão e tente novamente</p>
+                    <h5 style="color: #f44336;"></h5>
+                    <p class="erro-orientacao"></p>
+                    <p class="erro-detalhe" style="font-size: 0.8rem; opacity: 0.7;"></p>
+                    <button type="button" onclick="location.reload()"
+                        style="margin-top: 12px; padding: 8px 16px; cursor: pointer;">Tentar novamente</button>
                 </div>
             `;
+            // textContent evita injetar HTML vindo de mensagens de erro
+            loadingOverlay.querySelector('h5').textContent = titulo;
+            loadingOverlay.querySelector('.erro-orientacao').textContent = orientacao;
+            loadingOverlay.querySelector('.erro-detalhe').textContent = detalhe ? `Detalhe técnico: ${detalhe}` : '';
         }
     }
 };

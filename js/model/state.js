@@ -2,8 +2,8 @@
 // Model / state.js — estado global dos dados carregados do Excel
 // ============================================================
 
-// 📦 URL da planilha "Pauta Diária"
-export const excelUrl = "https://fundacaooswaldoaranha-my.sharepoint.com/personal/wesley_balbino_foa_org_br/_layouts/15/download.aspx?share=EdsT2JkTPstFhYTAoyB0kWwB0T83o-R9AR4Wu2Yex8hxBw";
+// 📦 URL da planilha "Pauta Diária" — definida em env.js (fora do Git)
+export const excelUrl = (window.ENV && window.ENV.EXCEL_URL) || "";
 
 // 🗂️ Dados carregados do Excel
 export let dadosExcel = [];
