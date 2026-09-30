@@ -2,7 +2,7 @@
 // Model / excelService.js — carregamento da planilha e cache local
 // ============================================================
 
-import { excelUrl, dadosExcel, dataB3, dataB3Formatada, setDadosExcel, setDataB3, setDataB3Formatada } from "./state.js";
+import { excelUrl, usandoApi, dadosExcel, dataB3, dataB3Formatada, setDadosExcel, setDataB3, setDataB3Formatada } from "./state.js";
 import { converterDataExcelParaPtBR, converterDataExcelParaPtBRComHora } from "./dateUtils.js";
 
 export function limparLocalStorage() {
@@ -52,22 +52,48 @@ export class ErroPlanilha extends Error {
     }
 }
 
+const ONDE_CONFIGURAR = usandoApi
+    ? "Atualize a variável EXCEL_URL na Vercel (Settings → Environment Variables) e faça um Redeploy."
+    : "Atualize EXCEL_URL no arquivo env.js.";
+
 const ORIENTACAO_LINK =
-    "No SharePoint, abra a planilha em Compartilhar → Configurações do link, " +
-    "escolha \"Qualquer pessoa com o link\", copie o novo link e atualize " +
-    "EXCEL_URL no arquivo env.js.";
+    "Use um link de compartilhamento público: no SharePoint, abra a planilha em " +
+    "Compartilhar → Configurações do link, escolha \"Qualquer pessoa com o link\" e copie o link. " +
+    "Links diretos (…/Documents/…/Pauta_Diaria.xlsx) exigem login e não funcionam. " +
+    ONDE_CONFIGURAR;
+
+// Traduz os códigos de erro devolvidos por /api/planilha
+function erroDaApi(codigo, detalhe) {
+    switch (codigo) {
+        case "SEM_CONFIG":
+            return new ErroPlanilha(
+                "O link da planilha não está configurado na Vercel.",
+                "Crie a variável EXCEL_URL em Settings → Environment Variables e faça um Redeploy.",
+                detalhe
+            );
+        case "NAO_E_XLSX":
+            return new ErroPlanilha(
+                "O link não retornou a planilha Excel — ele exige login ou o compartilhamento expirou.",
+                "O SharePoint devolveu uma página (login ou acesso negado) em vez do arquivo. " + ORIENTACAO_LINK,
+                detalhe
+            );
+        case "FALHA_REDE":
+            return new ErroPlanilha(
+                "O servidor não conseguiu acessar o SharePoint.",
+                "Tente novamente em alguns minutos. Se persistir, confira o link. " + ORIENTACAO_LINK,
+                detalhe
+            );
+        default:
+            return new ErroPlanilha(
+                "O SharePoint retornou um erro ao baixar a planilha.",
+                "Tente novamente em alguns minutos. Se persistir, confira o link. " + ORIENTACAO_LINK,
+                detalhe
+            );
+    }
+}
 
 // 📥 Baixa a planilha e garante que o conteúdo é realmente um .xlsx
 async function baixarPlanilha() {
-    if (!excelUrl) {
-        throw new ErroPlanilha(
-            "O link da planilha não está configurado.",
-            "Crie o arquivo env.js na raiz do projeto com o conteúdo: " +
-            "window.ENV = { EXCEL_URL: \"<link de download da planilha>\" };",
-            "window.ENV.EXCEL_URL vazio ou env.js não carregado"
-        );
-    }
-
     let response;
     try {
         response = await fetch(excelUrl);
@@ -75,13 +101,28 @@ async function baixarPlanilha() {
         // fetch só lança exceção em falha de rede ou bloqueio de CORS —
         // no SharePoint isso normalmente significa que o link exige login.
         throw new ErroPlanilha(
-            "Não foi possível acessar a planilha no SharePoint.",
+            "Não foi possível acessar a planilha.",
             "Verifique sua conexão. Se a internet estiver ok, o link provavelmente " +
             "exige login ou não é público. " + ORIENTACAO_LINK,
             erroRede.message
         );
     }
 
+    // Erros tratados pela função /api/planilha chegam como JSON { codigo, detalhe }
+    const tipo = response.headers.get("content-type") || "";
+    if (!response.ok && tipo.includes("application/json")) {
+        const { codigo, detalhe } = await response.json().catch(() => ({}));
+        throw erroDaApi(codigo, detalhe);
+    }
+
+    if (response.status === 404 && usandoApi) {
+        throw new ErroPlanilha(
+            "A função /api/planilha não foi encontrada.",
+            "Abrindo o dashboard fora da Vercel? Crie um env.js na raiz com " +
+            "window.ENV = { EXCEL_URL: \"<link de download da planilha>\" };",
+            "HTTP 404 em /api/planilha"
+        );
+    }
     if (response.status === 401 || response.status === 403) {
         throw new ErroPlanilha(
             "Sem permissão para acessar a planilha.",
@@ -97,11 +138,7 @@ async function baixarPlanilha() {
         );
     }
     if (!response.ok) {
-        throw new ErroPlanilha(
-            "O SharePoint retornou um erro ao baixar a planilha.",
-            "Tente novamente em alguns minutos. Se persistir, confira o link em env.js.",
-            `HTTP ${response.status} ${response.statusText}`
-        );
+        throw erroDaApi("HTTP", `HTTP ${response.status} ${response.statusText}`);
     }
 
     const buffer = await response.arrayBuffer();
