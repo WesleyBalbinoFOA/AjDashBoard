@@ -2,8 +2,11 @@
 // Model / state.js — estado global dos dados carregados do Excel
 // ============================================================
 
-// 📦 URL da planilha "Pauta Diária" — definida em env.js (fora do Git)
-export const excelUrl = (window.ENV && window.ENV.EXCEL_URL) || "";
+// 📦 URL da planilha "Pauta Diária"
+// - Na Vercel: a função /api/planilha lê a variável de ambiente EXCEL_URL.
+// - Localmente: se existir env.js (fora do Git) com window.ENV.EXCEL_URL, usa o link direto.
+export const excelUrl = (window.ENV && window.ENV.EXCEL_URL) || "/api/planilha";
+export const usandoApi = excelUrl === "/api/planilha";
 
 // 🗂️ Dados carregados do Excel
 export let dadosExcel = [];
