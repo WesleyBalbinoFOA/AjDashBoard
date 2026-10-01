@@ -77,6 +77,20 @@ function erroDaApi(codigo, detalhe) {
                 "O SharePoint devolveu uma página (login ou acesso negado) em vez do arquivo. " + ORIENTACAO_LINK,
                 detalhe
             );
+        case "SEM_PERMISSAO":
+            return new ErroPlanilha(
+                "O SharePoint negou o acesso à planilha (o link exige login).",
+                "O link configurado não é público — provavelmente foi criado como " +
+                "\"Pessoas na Fundação Oswaldo Aranha\" ou o compartilhamento foi removido. " +
+                "Teste o link numa janela anônima: se pedir login, gere outro. " + ORIENTACAO_LINK,
+                detalhe
+            );
+        case "NAO_ENCONTRADA":
+            return new ErroPlanilha(
+                "A planilha não foi encontrada no SharePoint.",
+                "O arquivo pode ter sido movido, renomeado ou excluído, ou o link foi desativado. " + ORIENTACAO_LINK,
+                detalhe
+            );
         case "FALHA_REDE":
             return new ErroPlanilha(
                 "O servidor não conseguiu acessar o SharePoint.",
